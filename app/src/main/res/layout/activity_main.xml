@@ -9,7 +9,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="8dp" >
 
         <TextView
             android:layout_width="match_parent"
@@ -34,6 +35,31 @@
             android:layout_height="wrap_content"
             android:inputType="number"
             android:text="2" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioGroup
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/gpu_fp_radio_group">
+
+                <RadioButton
+                    android:id="@+id/fp32_radio_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="FP32"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/fp16_radio_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="FP16" />
+            </RadioGroup>
+        </LinearLayout>
 
         <Button
             android:id="@+id/test_run_button"

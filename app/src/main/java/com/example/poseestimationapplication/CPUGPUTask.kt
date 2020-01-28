@@ -33,6 +33,8 @@ class CPUGPUTask(activity: Activity) : Thread() {
     private val testRound = 10
     private var testRoundFinished = false
 
+    private var useGpuFp16 = false
+
     private val testDelayResult = arrayOfNulls<Long>(3)
 
     init {
@@ -51,11 +53,15 @@ class CPUGPUTask(activity: Activity) : Thread() {
         testCPUPicNum = num
     }
 
+    public fun setUseGpuFp16(useGpuFp16: Boolean) {
+        this.useGpuFp16 = useGpuFp16
+    }
+
     private fun initTFLite() {
         mCPUHourGlass = ImageClassifierFloatInception.create(mActivity, modelPath = "hourglass_model.tflite")
         mGPUHourGlass = ImageClassifierFloatInception.create(mActivity, modelPath = "hourglass_model.tflite")
-        mCPUHourGlass?.initTFLite(false)
-        mGPUHourGlass?.initTFLite(true)
+        mCPUHourGlass?.initTFLite(false, useGpuFp16)
+        mGPUHourGlass?.initTFLite(true, useGpuFp16)
     }
 
     private fun closeTFLite() {

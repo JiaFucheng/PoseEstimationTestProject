@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import com.example.poseestimationapplication.tflite.ImageClassifierFloatInception
+import com.example.poseestimationapplication.tool.BitmapLoader
 
 class CPUGPUTask(activity: Activity) : Thread() {
 
@@ -73,7 +74,7 @@ class CPUGPUTask(activity: Activity) : Thread() {
     private fun warmUpRun() {
         Log.i(TAG, "Warm up run start")
 
-        val bmpArray = loadRandomDataPictures(2)
+        val bmpArray = BitmapLoader.loadRandomDataPictures(2, picWidth, picHeight)
 
         var gpuWarmUpFinished = false
         gpuThreadHandler.post {
@@ -93,7 +94,7 @@ class CPUGPUTask(activity: Activity) : Thread() {
     private fun serialRun() {
         Log.i(TAG, "Serial run start")
 
-        val bmpArray = loadAssetsPictures(testPicNum)
+        val bmpArray = BitmapLoader.loadAssetsPictures(mActivity, testPicNum)
         val cpuTaskCount = testCPUPicNum
 
         taskStartTime = System.currentTimeMillis()
@@ -118,7 +119,7 @@ class CPUGPUTask(activity: Activity) : Thread() {
     private fun parallelRun() {
         Log.i(TAG, "Parallel run start")
 
-        val bmpArray = loadAssetsPictures(testPicNum)
+        val bmpArray = BitmapLoader.loadAssetsPictures(mActivity, testPicNum)
         val cpuTaskCount = testCPUPicNum
 
         // 重置CPU/GPU计数为2
@@ -233,34 +234,5 @@ class CPUGPUTask(activity: Activity) : Thread() {
         } catch (e: InterruptedException) {
             e.printStackTrace()
         }
-    }
-
-    // 加载随机数据的图片
-    private fun loadRandomDataPictures(num: Int): ArrayList<Bitmap> {
-        val bmpArray: ArrayList<Bitmap> = ArrayList<Bitmap>()
-
-        for (i in 0..num) {
-            val bitmap: Bitmap = Bitmap.createBitmap(picWidth, picHeight, Bitmap.Config.ARGB_8888)
-            bmpArray.add(bitmap)
-        }
-
-        return bmpArray
-    }
-
-    // 加载Assets目录中的图片
-    private fun loadAssetsPictures(num: Int): ArrayList<Bitmap> {
-        val am: AssetManager = mActivity.assets
-
-        val bitmapArray = ArrayList<Bitmap>()
-
-        for (i in 0 until num) {
-            val picNo = i + 1
-            val fileName = "pose_$picNo.png"
-            val inputStream = am.open(fileName)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            bitmapArray.add(bitmap)
-        }
-
-        return bitmapArray
     }
 }

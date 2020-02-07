@@ -86,7 +86,7 @@ internal constructor(
     }
 
     /** Classifies a frame from the preview stream.  */
-    public fun classifyFrame(bitmap: Bitmap): String {
+    public fun classifyFrame(bitmap: Bitmap, heatMaps: ArrayList<Array<Array<Array<FloatArray>>>>?): String {
         if (tflite == null) {
             Log.e(TAG, "Image classifier has not been initialized; Skipped.")
             return "Uninitialized Classifier."
@@ -94,9 +94,12 @@ internal constructor(
         convertBitmapToByteBuffer(bitmap)
         // Here's where the magic happens!!!
         val startTime = SystemClock.uptimeMillis()
-        runInference()
+        val heatMap = runInference()
         val endTime = SystemClock.uptimeMillis()
         Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime))
+
+        if (heatMap != null && heatMaps != null)
+            heatMaps.add(heatMap)
 
         bitmap.recycle()
         // Print the results.
@@ -104,6 +107,9 @@ internal constructor(
         return Long.toString(endTime - startTime)
     }
 
+    public fun classifyFrame(bitmap: Bitmap): String {
+        return classifyFrame(bitmap, null)
+    }
 
     /** Closes tflite to release resources.  */
     fun close() {
@@ -188,7 +194,7 @@ internal constructor(
      * This additional method is necessary, because we don't have a common base for different
      * primitive data types.
      */
-    protected abstract fun runInference()
+    protected abstract fun runInference() : Array<Array<Array<FloatArray>>>?
 
     companion object {
 

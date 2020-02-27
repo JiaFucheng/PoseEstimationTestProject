@@ -62,9 +62,9 @@ internal constructor(
         return mPrintPointArray
     }
 
-    public fun initTFLite(useGPU: Boolean, useGpuFp16: Boolean){
+    public fun initTFLite(numThreads: Int, useGPU: Boolean, useGpuFp16: Boolean){
         val tfliteOptions = Interpreter.Options()
-        //tfliteOptions.setNumThreads(1)
+        tfliteOptions.setNumThreads(numThreads)
         if(useGPU){
             val gpuOptions = GpuDelegate.Options()
             gpuOptions.setPrecisionLossAllowed(useGpuFp16)

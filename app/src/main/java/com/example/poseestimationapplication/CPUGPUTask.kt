@@ -61,8 +61,8 @@ class CPUGPUTask(activity: Activity) : Thread() {
     private fun initTFLite() {
         mCPUHourGlass = ImageClassifierFloatInception.create(mActivity, modelPath = "hourglass_model.tflite")
         mGPUHourGlass = ImageClassifierFloatInception.create(mActivity, modelPath = "hourglass_model.tflite")
-        mCPUHourGlass?.initTFLite(false, useGpuFp16)
-        mGPUHourGlass?.initTFLite(true, useGpuFp16)
+        mCPUHourGlass?.initTFLite(-1, false, useGpuFp16)
+        mGPUHourGlass?.initTFLite(-1, true, useGpuFp16)
     }
 
     private fun closeTFLite() {

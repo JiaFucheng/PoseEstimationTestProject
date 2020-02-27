@@ -9,13 +9,159 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:orientation="vertical"
+
+        android:padding="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="4dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Rounds" />
+
+                <EditText
+                    android:id="@+id/rounds_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="1" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="4dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Frames" />
+
+                <EditText
+                    android:id="@+id/frame_count_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="20" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="4dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Interval (ms)" />
+
+                <EditText
+                    android:id="@+id/frame_interval_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="25" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="4dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Human/Frame" />
+
+                <EditText
+                    android:id="@+id/num_pic_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mode" />
+
+        <Spinner
+            android:id="@+id/sche_mode_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Number of Threads (in TFLite)" />
+
+        <Spinner
+            android:id="@+id/num_threads_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GPU" />
+
+        <RadioGroup
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/gpu_fp_radio_group">
+
+            <RadioButton
+                android:id="@+id/fp32_radio_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="FP32"
+                android:checked="true" />
+
+            <RadioButton
+                android:id="@+id/fp16_radio_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="FP16" />
+        </RadioGroup>
 
         <Button
             android:id="@+id/test_button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="TEST" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Other Tests" />
+
+        <Button
+            android:id="@+id/task1_test_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="NUM_THREADS TEST" />
+
+        <Button
+            android:id="@+id/task2_test_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="[N,T_TF,T] TEST" />
     </LinearLayout>
 
 </android.support.design.widget.CoordinatorLayout>

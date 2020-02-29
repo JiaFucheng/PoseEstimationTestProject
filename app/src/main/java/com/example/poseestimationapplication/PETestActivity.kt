@@ -21,7 +21,9 @@ class PETestActivity : AppCompatActivity() {
         val picNumEditText = findViewById<EditText>(R.id.num_pic_edit_text)
         val modeSpinner = findViewById<Spinner>(R.id.sche_mode_spinner)
         val numThreadsSpinner = findViewById<Spinner>(R.id.num_threads_spinner)
-        val gpuFPRadioGroup = findViewById<RadioGroup>(R.id.gpu_fp_radio_group)
+        val cpuFpRadioGroup = findViewById<RadioGroup>(R.id.cpu_fp_radio_group)
+        val gpuModelFpRadioGroup = findViewById<RadioGroup>(R.id.gpu_model_fp_radio_group)
+        val gpuFpRadioGroup = findViewById<RadioGroup>(R.id.gpu_fp_radio_group)
         val testButton = findViewById<Button>(R.id.test_button)
 
         // Get array resource
@@ -41,12 +43,14 @@ class PETestActivity : AppCompatActivity() {
             val picNum = picNumEditText.text.toString().toInt()
             val mode = modeSpinner.selectedItemPosition
             val numThreads = getNumThreadsFromSpinner(numThreadsSpinner)
-            val useGpuFp16 = getUseGpuFp16FromRadioGroup(gpuFPRadioGroup)
+            val useCpuFp16 = getUseCpuFp16FromRadioGroup(cpuFpRadioGroup)
+            val useGpuModelFp16 = getUseGpuModelFp16FromRadioGroup(gpuModelFpRadioGroup)
+            val useGpuFp16 = getUseGpuFp16FromRadioGroup(gpuFpRadioGroup)
 
             //PETestTask(this).start()
             PETestTask(this).test(
-                    rounds, frames, frameInterval, picNum, mode, numThreads, useGpuFp16)
-
+                    rounds, frames, frameInterval, picNum,
+                    mode, numThreads, useCpuFp16, useGpuModelFp16, useGpuFp16)
 
             showTestStartToast()
         }
@@ -70,6 +74,38 @@ class PETestActivity : AppCompatActivity() {
             return -1
         else
             return spinner.selectedItemPosition
+    }
+
+    private fun getUseCpuFp16FromRadioGroup(rg: RadioGroup): Boolean {
+        var checkedId = 0
+        for (i in 0 until rg.childCount) {
+            val rb : RadioButton = rg.getChildAt(i) as RadioButton
+            if (rb.isChecked) {
+                checkedId = i
+            }
+        }
+
+        var useCpuFp16 = false
+        if (checkedId == 1)
+            useCpuFp16 = true
+
+        return useCpuFp16
+    }
+
+    private fun getUseGpuModelFp16FromRadioGroup(rg: RadioGroup): Boolean {
+        var checkedId = 0
+        for (i in 0 until rg.childCount) {
+            val rb : RadioButton = rg.getChildAt(i) as RadioButton
+            if (rb.isChecked) {
+                checkedId = i
+            }
+        }
+
+        var useGpuFp16 = false
+        if (checkedId == 1)
+            useGpuFp16 = true
+
+        return useGpuFp16
     }
 
     private fun getUseGpuFp16FromRadioGroup(rg: RadioGroup): Boolean {

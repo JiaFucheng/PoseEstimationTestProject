@@ -1,8 +1,6 @@
 package com.example.poseestimationapplication
 
 import android.app.Activity
-import android.os.Handler
-import android.os.HandlerThread
 import android.util.Log
 import com.example.poseestimationapplication.peschedule.PETaskScheduler
 import com.example.poseestimationapplication.tool.BitmapLoader
@@ -13,6 +11,8 @@ class PETestTask(activity: Activity) : Thread() {
     private var numPic = -1
     private var mode = PETaskScheduler.MODE_CPU
     private var numThreads = -1
+    private var useCpuFp16 = false
+    private var useGpuModelFp16 = false
     private var useGpuFp16 = false
     // 测试轮数
     private var testRound = 1
@@ -34,7 +34,7 @@ class PETestTask(activity: Activity) : Thread() {
         // 创建PETaskScheduler
         val peTaskScheduler = PETaskScheduler(mActivity)
         // 初始化
-        peTaskScheduler.init(numThreads, useGpuFp16)
+        peTaskScheduler.init(192, numThreads, useCpuFp16, useGpuModelFp16, useGpuFp16)
         // 设置开始时间
         peTaskScheduler.setTaskStartTime(System.currentTimeMillis())
 
@@ -68,13 +68,16 @@ class PETestTask(activity: Activity) : Thread() {
     }
 
     public fun test(round: Int, frames: Int, frameInterval: Int, numPic: Int,
-                    mode: Int,  numThreads: Int, useGpuFp16: Boolean) {
+                    mode: Int, numThreads: Int,
+                    useCpuFp16: Boolean, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
         this.testRound = round
         this.testFrameCount = frames
         this.frameIntervalTime = frameInterval
         this.numPic = numPic
         this.mode = mode
         this.numThreads = numThreads
+        this.useCpuFp16 = useCpuFp16
+        this.useGpuModelFp16 = useGpuModelFp16
         this.useGpuFp16 = useGpuFp16
         start()
     }

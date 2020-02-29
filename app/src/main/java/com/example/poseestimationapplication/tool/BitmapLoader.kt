@@ -12,7 +12,7 @@ class BitmapLoader {
         public fun loadRandomDataPictures(num: Int, picWidth: Int, picHeight: Int): ArrayList<Bitmap> {
             val bmpArray: ArrayList<Bitmap> = ArrayList<Bitmap>()
 
-            for (i in 0..num) {
+            for (i in 0 until num) {
                 val bitmap: Bitmap = Bitmap.createBitmap(picWidth, picHeight, Bitmap.Config.ARGB_8888)
                 bmpArray.add(bitmap)
             }

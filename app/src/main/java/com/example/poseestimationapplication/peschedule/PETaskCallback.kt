@@ -6,11 +6,11 @@ class PETaskCallback {
 
     private val TAG = "PETaskCallback"
 
-    public fun call(heatMaps : ArrayList<Array<Array<Array<FloatArray>>>>) {
-        Log.i(TAG, "Process heat maps in PE task callback")
+    public fun call(pointArrays : ArrayList<Array<FloatArray>>) {
+        Log.i(TAG, "Process point array in PE task callback")
 
-        for (heatMap in heatMaps) {
-            // TODO: Process heat maps here
+        for (pointArray in pointArrays) {
+            // TODO: Process point array here
         }
     }
 

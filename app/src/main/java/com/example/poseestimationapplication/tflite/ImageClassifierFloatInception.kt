@@ -48,11 +48,13 @@ class ImageClassifierFloatInception private constructor(
         return getProbability(labelIndex)
     }
 
-    override fun runInference() : Array<Array<Array<FloatArray>>>? {
+    // heatMaps: Array<Array<Array<FloatArray>>>?
+    // pointArray: Array
+    override fun runInference() {
         //Log.i("TestOutPut", "start")
         tflite?.run(imgData!!, heatMapArray)
 
-        return heatMapArray.clone()
+        //return heatMapArray.clone()
 
         if (mPrintPointArray == null)
             mPrintPointArray = Array(2) { FloatArray(14) }
@@ -97,20 +99,15 @@ class ImageClassifierFloatInception private constructor(
                 }
             }
 
-
-
-
             if (max == 0f) {
                 mPrintPointArray = Array(2) { FloatArray(14) }
-
-                return null
+                return
             }
 
             mPrintPointArray!![0][i] = maxX
             mPrintPointArray!![1][i] = maxY
 
-
-            Log.i("TestOutPut", "pic[$i] ($maxX,$maxY) $max")
+            //Log.i("TestOutPut", "pic[$i] ($maxX,$maxY) $max")
         }
     }
 

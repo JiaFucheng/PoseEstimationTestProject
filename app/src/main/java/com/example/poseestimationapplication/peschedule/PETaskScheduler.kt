@@ -403,6 +403,7 @@ class PETaskScheduler(private val activity: Activity) {
                         //Log.i(TAG, "CPU classify frame $i")
                         //Log.i(TAG, "CPU left ${cpuBitmaps.size} bitmaps")
 
+                        /*
                         if (cpuBitmaps.size >= 2) {
                             //Log.i(TAG, "CPU take 2 bitmaps")
 
@@ -415,7 +416,7 @@ class PETaskScheduler(private val activity: Activity) {
                             cpuBitmaps.remove(b1)
 
                             cpuPointArrays.addAll(outPointArrays)
-                        } else {
+                        } else { */
                             //Log.i(TAG, "CPU take 1 bitmaps")
 
                             val bitmap = cpuBitmaps[0]
@@ -431,7 +432,7 @@ class PETaskScheduler(private val activity: Activity) {
 
                             onDeviceEvaluator.updateDeviceExecutionTime(
                                     OnDeviceEvaluator.DEVICE_ID_CPU, costTime!!.toFloat())
-                        }
+                        //}
                     }
 
                     cpuPointArrayQueue.enqueue(cpuPointArrays)

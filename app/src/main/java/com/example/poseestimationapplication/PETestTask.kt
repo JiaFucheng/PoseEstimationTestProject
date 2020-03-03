@@ -11,6 +11,7 @@ class PETestTask(activity: Activity) : Thread() {
     private var numPic = -1
     private var mode = PETaskScheduler.MODE_CPU
     private var numThreads = -1
+    private var useCpuFp8 = false
     private var useCpuFp16 = false
     private var useGpuModelFp16 = false
     private var useGpuFp16 = false
@@ -34,7 +35,7 @@ class PETestTask(activity: Activity) : Thread() {
         // 创建PETaskScheduler
         val peTaskScheduler = PETaskScheduler(mActivity)
         // 初始化
-        peTaskScheduler.init(192, numThreads, useCpuFp16, useGpuModelFp16, useGpuFp16)
+        peTaskScheduler.init(192, numThreads, useCpuFp8, useCpuFp16, useGpuModelFp16, useGpuFp16)
         // 设置开始时间
         peTaskScheduler.setTaskStartTime(System.currentTimeMillis())
 
@@ -69,13 +70,15 @@ class PETestTask(activity: Activity) : Thread() {
 
     public fun test(round: Int, frames: Int, frameInterval: Int, numPic: Int,
                     mode: Int, numThreads: Int,
-                    useCpuFp16: Boolean, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
+                    useCpuFp8: Boolean, useCpuFp16: Boolean,
+                    useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
         this.testRound = round
         this.testFrameCount = frames
         this.frameIntervalTime = frameInterval
         this.numPic = numPic
         this.mode = mode
         this.numThreads = numThreads
+        this.useCpuFp8 = useCpuFp8
         this.useCpuFp16 = useCpuFp16
         this.useGpuModelFp16 = useGpuModelFp16
         this.useGpuFp16 = useGpuFp16

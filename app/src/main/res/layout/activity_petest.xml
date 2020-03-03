@@ -123,20 +123,27 @@
         <RadioGroup
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/cpu_fp_radio_group">
+            android:id="@+id/cpu_fp_radio_group"
+            android:orientation="horizontal" >
 
             <RadioButton
                 android:id="@+id/cpu_fp32_radio_button"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="FP32"
-                android:checked="true" />
+                android:checked="true"
+                android:text="FP32" />
 
             <RadioButton
                 android:id="@+id/cpu_fp16_radio_button"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="FP16" />
+
+            <RadioButton
+                android:id="@+id/cpu_fp8_radio_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="FP8" />
         </RadioGroup>
 
 
@@ -158,7 +165,8 @@
                 <RadioGroup
                     android:id="@+id/gpu_model_fp_radio_group"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" >
 
                     <RadioButton
                         android:id="@+id/gpu_model_fp32_radio_button"
@@ -190,7 +198,8 @@
                 <RadioGroup
                     android:id="@+id/gpu_fp_radio_group"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" >
 
                     <RadioButton
                         android:id="@+id/gpu_fp32_radio_button"

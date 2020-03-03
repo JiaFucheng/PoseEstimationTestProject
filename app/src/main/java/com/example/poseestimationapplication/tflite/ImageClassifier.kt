@@ -15,8 +15,6 @@ package com.example.poseestimationapplication.tflite
  * limitations under the License.
  */
 
-
-
 import android.app.Activity
 import android.graphics.Bitmap
 import android.os.SystemClock
@@ -37,7 +35,7 @@ abstract class ImageClassifier
 /** Initializes an `ImageClassifier`.  */
 //@Throws(IOException::class)
 internal constructor(
-        activity: Activity,
+        private val activity: Activity,
         val imageSizeX: Int, // Get the image size along the x axis.
         val imageSizeY: Int, // Get the image size along the y axis.
         private val modelPath: String, // Get the name of the model file stored in Assets.
@@ -45,7 +43,7 @@ internal constructor(
         numBytesPerChannel: Int
 ) {
 
-    /* Preallocated buffers for storing image data in. */
+    /* Preallocated buffers for storing image data in.  */
     private val intValues = IntArray(imageSizeX * imageSizeY)
 
     /** An instance of the driver class to run model inference with Tensorflow Lite.  */
@@ -54,13 +52,8 @@ internal constructor(
     /** A ByteBuffer to hold image data, to be feed into Tensorflow Lite as inputs.  */
     protected var imgData: ByteBuffer? = null
 
-    var mPrintPointArray: Array<FloatArray>? = null
-
-    val activity = activity
-
-    fun getPointArray():Array<FloatArray>?{
-        return mPrintPointArray
-    }
+    /** Number of bytes per channel, default is 4  */
+    protected var numBytesPerChannel: Int = 4
 
     public fun initTFLite(numThreads: Int, useGPU: Boolean, useGpuFp16: Boolean){
         val tfliteOptions = Interpreter.Options()
@@ -74,6 +67,8 @@ internal constructor(
     }
 
     init {
+        this.numBytesPerChannel = numBytesPerChannel
+
         imgData = ByteBuffer.allocateDirect(
                 DIM_BATCH_SIZE
                         * imageSizeX
@@ -100,7 +95,7 @@ internal constructor(
 
         bitmap.recycle()
         // Print the results.
-        //    String textToShow = printTopKLabels();
+        //String textToShow = printTopKLabels();
         return Long.toString(endTime - startTime)
     }
 
@@ -134,6 +129,7 @@ internal constructor(
         for (i in 0 until imageSizeX) {
             for (j in 0 until imageSizeY) {
                 val v = intValues[pixel++]
+                // Add bitmap value to imgData
                 addPixelValue(v)
             }
         }
@@ -190,7 +186,6 @@ internal constructor(
     protected abstract fun runInference()
 
     companion object {
-
         /** Tag for the [Log].  */
         private const val TAG = "TfLiteCameraDemo"
 

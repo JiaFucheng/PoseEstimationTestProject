@@ -43,6 +43,7 @@ class PETestActivity : AppCompatActivity() {
             val picNum = picNumEditText.text.toString().toInt()
             val mode = modeSpinner.selectedItemPosition
             val numThreads = getNumThreadsFromSpinner(numThreadsSpinner)
+            val useCpuFp8 = getUseCpuFp8FromRadioGroup(cpuFpRadioGroup)
             val useCpuFp16 = getUseCpuFp16FromRadioGroup(cpuFpRadioGroup)
             val useGpuModelFp16 = getUseGpuModelFp16FromRadioGroup(gpuModelFpRadioGroup)
             val useGpuFp16 = getUseGpuFp16FromRadioGroup(gpuFpRadioGroup)
@@ -50,7 +51,7 @@ class PETestActivity : AppCompatActivity() {
             //PETestTask(this).start()
             PETestTask(this).test(
                     rounds, frames, frameInterval, picNum,
-                    mode, numThreads, useCpuFp16, useGpuModelFp16, useGpuFp16)
+                    mode, numThreads, useCpuFp8, useCpuFp16, useGpuModelFp16, useGpuFp16)
 
             showTestStartToast()
         }
@@ -90,6 +91,22 @@ class PETestActivity : AppCompatActivity() {
             useCpuFp16 = true
 
         return useCpuFp16
+    }
+
+    private fun getUseCpuFp8FromRadioGroup(rg: RadioGroup): Boolean {
+        var checkedId = 0
+        for (i in 0 until rg.childCount) {
+            val rb : RadioButton = rg.getChildAt(i) as RadioButton
+            if (rb.isChecked) {
+                checkedId = i
+            }
+        }
+
+        var useCpuFp8 = false
+        if (checkedId == 2)
+            useCpuFp8 = true
+
+        return useCpuFp8
     }
 
     private fun getUseGpuModelFp16FromRadioGroup(rg: RadioGroup): Boolean {

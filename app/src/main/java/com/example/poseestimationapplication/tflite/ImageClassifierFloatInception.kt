@@ -2,6 +2,7 @@ package com.example.poseestimationapplication.tflite
 
 import android.app.Activity
 import android.util.Log
+import java.util.*
 
 /**
  * Pose Estimator
@@ -20,20 +21,34 @@ class ImageClassifierFloatInception private constructor(
      * An array to hold inference results, to be feed into Tensorflow Lite as outputs.
      * This isn't part of the super class, because we need a primitive array here.
      */
-    private val heatMapArray: Array<Array<Array<FloatArray>>> =
+    private var heatMapArray: Array<Array<Array<FloatArray>>> =
             Array(1) { Array(outputW) { Array(outputH) { FloatArray(14) } } }
-
+    private var heatMapArrayByte: Array<Array<Array<ByteArray>>> =
+            Array(1) { Array(outputW) { Array(outputH) { ByteArray(14) } } }
     //private var mMat: Mat? = null
 
+    private var mPrintPointArray: Array<FloatArray>? = null
+
+    public fun getPointArray(): Array<FloatArray>? {
+        return mPrintPointArray
+    }
+
     override fun addPixelValue(pixelValue: Int) {
-        //bgr
-        imgData!!.putFloat((pixelValue and 0xFF).toFloat())
-        imgData!!.putFloat((pixelValue shr 8 and 0xFF).toFloat())
-        imgData!!.putFloat((pixelValue shr 16 and 0xFF).toFloat())
+        if (numBytesPerChannel == 4) {
+            // bgr, float
+            imgData!!.putFloat((pixelValue and 0xFF).toFloat())
+            imgData!!.putFloat((pixelValue shr 8  and 0xFF).toFloat())
+            imgData!!.putFloat((pixelValue shr 16 and 0xFF).toFloat())
+        } else if (numBytesPerChannel == 1) {
+            // bgr, byte
+            imgData!!.put((pixelValue and 0xFF).toByte())
+            imgData!!.put((pixelValue shr 8  and 0xFF).toByte())
+            imgData!!.put((pixelValue shr 16 and 0xFF).toByte())
+        }
     }
 
     override fun getProbability(labelIndex: Int): Float {
-        //    return heatMapArray[0][labelIndex];
+        //return heatMapArray[0][labelIndex];
         return 0f
     }
 
@@ -41,7 +56,7 @@ class ImageClassifierFloatInception private constructor(
             labelIndex: Int,
             value: Number
     ) {
-        //    heatMapArray[0][labelIndex] = value.floatValue();
+        //heatMapArray[0][labelIndex] = value.floatValue();
     }
 
     override fun getNormalizedProbability(labelIndex: Int): Float {
@@ -51,8 +66,13 @@ class ImageClassifierFloatInception private constructor(
     // heatMaps: Array<Array<Array<FloatArray>>>?
     // pointArray: Array
     override fun runInference() {
+        if (numBytesPerChannel == 4) {
+            tflite?.run(imgData!!, heatMapArray)
+        } else if (numBytesPerChannel == 1) {
+            tflite?.run(imgData!!, heatMapArrayByte)
+        }
+
         //Log.i("TestOutPut", "start")
-        tflite?.run(imgData!!, heatMapArray)
 
         //return heatMapArray.clone()
 
@@ -69,7 +89,7 @@ class ImageClassifierFloatInception private constructor(
         //    mMat = Mat(outputW, outputH, CvType.CV_32F)
 
         val tempArray = FloatArray(outputW * outputH)
-        val outTempArray = FloatArray(outputW * outputH)
+        //val outTempArray = FloatArray(outputW * outputH)
         for (i in 0..13) {
             var index = 0
             for (x in 0 until outputW) {
@@ -90,7 +110,7 @@ class ImageClassifierFloatInception private constructor(
             // Find keypoint coordinate through maximum values
             for (x in 0 until outputW) {
                 for (y in 0 until outputH) {
-                    val center = get(x, y, outTempArray)
+                    val center = get(x, y, tempArray)
                     if (center > max) {
                         max = center
                         maxX = x.toFloat()
@@ -100,12 +120,14 @@ class ImageClassifierFloatInception private constructor(
             }
 
             if (max == 0f) {
-                mPrintPointArray = Array(2) { FloatArray(14) }
-                return
+                //mPrintPointArray = Array(2) { FloatArray(14) }
+                //return
+                mPrintPointArray!![0][i] = 0.0f
+                mPrintPointArray!![1][i] = 0.0f
+            } else {
+                mPrintPointArray!![0][i] = maxX
+                mPrintPointArray!![1][i] = maxY
             }
-
-            mPrintPointArray!![0][i] = maxX
-            mPrintPointArray!![1][i] = maxY
 
             //Log.i("TestOutPut", "pic[$i] ($maxX,$maxY) $max")
         }

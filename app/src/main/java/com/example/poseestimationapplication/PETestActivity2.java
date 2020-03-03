@@ -61,9 +61,10 @@ public class PETestActivity2 extends AppCompatActivity {
         int inputSize = 192;
         int numThreads = 4;
         boolean useCpuFp8 = false;
+        boolean useCpuFp16 = false;
         boolean useGpuModelFp16 = false;
         boolean useGpuFp16 = false;
-        mPETaskScheduler.init(inputSize, numThreads, useCpuFp8, useGpuModelFp16, useGpuFp16);
+        mPETaskScheduler.init(inputSize, numThreads, useCpuFp8, useCpuFp16, useGpuModelFp16, useGpuFp16);
     }
 
     // 调用Scheduler
@@ -73,7 +74,7 @@ public class PETestActivity2 extends AppCompatActivity {
         ArrayList<Bitmap> bitmaps = BitmapLoader.Companion.loadRandomDataPictures(5, 192, 192);
 
         // 调用Scheduler进行调度和执行Human Bitmaps
-       long ticket = mPETaskScheduler.scheduleAndRun(bitmaps, PETaskScheduler.Companion.getMODE_CPUGPU_WMA());
+       long ticket = mPETaskScheduler.scheduleAndRun(bitmaps, PETaskScheduler.MODE_CPUGPU_WMA);
 
         ArrayList<float[][]> pointArrays = null;
 

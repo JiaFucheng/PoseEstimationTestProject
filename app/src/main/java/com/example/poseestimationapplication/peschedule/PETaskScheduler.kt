@@ -21,6 +21,12 @@ class PETaskScheduler(private val activity: Activity) {
         const val MODE_GPU = 1
         const val MODE_CPUGPU = 2
         const val MODE_CPUGPU_WMA = 3
+        const val MODE_CPUGPU_MT = 4
+        const val MODE_CPUGPU_MT_WMA = 5
+
+        const val CPU_INT_8 = 8
+        const val CPU_FP_16 = 16
+        const val CPU_FP_32 = 32
 
         private const val FLAG_CPU_TASK_FINISH = 0
         private const val FLAG_GPU_TASK_FINISH = 1
@@ -28,13 +34,24 @@ class PETaskScheduler(private val activity: Activity) {
 
     private val TAG = "PETaskScheduler"
 
+    /**
+     * tfliteModelName
+     * [0]: int8
+     * [1]: fp16
+     * [2]: fp32
+     */
+    private val tfliteModelNames = arrayListOf(
+            "hourglass_model_fp8.tflite",
+            "hourglass_model_fp16.tflite",
+            "hourglass_model.tflite")
+
     private val onDeviceEvaluator: OnDeviceEvaluator = OnDeviceEvaluator()
 
     private val cpuTasksQueue = PETasksQueue()
     private val gpuTasksQueue = PETasksQueue()
 
-    private val cpuPointArrayQueue = PointArraysQueue()
-    private val gpuPointArrayQueue = PointArraysQueue()
+    private val cpuPointArraysQueue = PointArraysQueue()
+    private val gpuPointArraysQueue = PointArraysQueue()
     private val outputPointArraysQueue = PointArraysQueue()
     private val outputTicketQueue = OutputTicketQueue()
 
@@ -42,7 +59,7 @@ class PETaskScheduler(private val activity: Activity) {
 
     private var mCPUHourGlass: ImageClassifierFloatInception ?= null
     private var mGPUHourGlass: ImageClassifierFloatInception ?= null
-    private var mCPUHourGlassT2 = ArrayList<ImageClassifierFloatInception>()
+    //private var mCPUHourGlassT2 = ArrayList<ImageClassifierFloatInception>()
     private var mCPUHourGlassMT = ArrayList<ArrayList<ImageClassifierFloatInception>>()
 
     private var cpuHandlerThread: HandlerThread ?= null
@@ -59,13 +76,15 @@ class PETaskScheduler(private val activity: Activity) {
 
     //private val peTaskCallback = PETaskCallback()
 
-    private var picWidth = 192
-    private var picHeight = 192
+    private var picWidth: Int = 192
+    private var picHeight: Int = 192
 
     private var curScheduleMode: Int = MODE_CPU
     private var taskId: Int = 0
     private var taskStartTime: Long = System.currentTimeMillis()
     private var taskCostTime: Long = 0
+
+    private var useMultiThreadModel: Boolean = true
 
     init {
         initHandlerThreads()
@@ -73,18 +92,12 @@ class PETaskScheduler(private val activity: Activity) {
 
     private fun getScheduleModeName(mode: Int) : String {
         when (mode) {
-            MODE_CPU -> {
-                return "CPU"
-            }
-            MODE_GPU -> {
-                return "GPU"
-            }
-            MODE_CPUGPU -> {
-                return "CPU-GPU"
-            }
-            MODE_CPUGPU_WMA -> {
-                return "CPU-GPU (WMA)"
-            }
+            MODE_CPU -> { return "CPU" }
+            MODE_GPU -> { return "GPU" }
+            MODE_CPUGPU -> { return "CPU-GPU" }
+            MODE_CPUGPU_WMA -> { return "CPU-GPU-WMA" }
+            MODE_CPUGPU_MT -> { return "CPU-GPU-MT" }
+            MODE_CPUGPU_MT_WMA -> { return "CPU-GPU-MT-WMA" }
         }
 
         return ""
@@ -124,7 +137,7 @@ class PETaskScheduler(private val activity: Activity) {
         return if (ticket == outputTicketQueue.getFirstTicket()) {
             val output = outputPointArraysQueue.dequeue()
             if (output != null)
-                outputTicketQueue.dequeueFirstTicket()
+                outputTicketQueue.dequeue()
             output
         } else {
             null
@@ -152,22 +165,19 @@ class PETaskScheduler(private val activity: Activity) {
         heatMapsHandlerThread?.quit()
     }
 
-    private fun initTFLite(numThreads: Int, useCpuFp8: Boolean, useCpuFp16: Boolean,
+    private fun initTFLite(numThreads: Int, cpuFp: Int,
                            useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
         val cpuModelName = when {
-            useCpuFp8  -> "hourglass_model_fp8.tflite"
-            useCpuFp16 -> "hourglass_model_fp16.tflite"
-            else       -> "hourglass_model.tflite"
+            (cpuFp == CPU_INT_8) -> tfliteModelNames[0]
+            (cpuFp == CPU_FP_16) -> tfliteModelNames[1]
+            else                 -> tfliteModelNames[2]
         }
-        // GPU may use these model
-        // "hourglass_model.tflite"
-        // "hourglass_model_fp16.tflite"
-        // "hourglass_model_fp16_02.tflite"
-        val gpuModelName = if (useGpuModelFp16) "hourglass_model_fp16_02.tflite"
-                           else                 "hourglass_model.tflite"
 
-        val numBytesPerChannel = if (useCpuFp8) 1
-                                 else           4
+        val gpuModelName = if (useGpuModelFp16) tfliteModelNames[1]
+                           else                 tfliteModelNames[2]
+
+        val numBytesPerChannel = if (cpuFp == CPU_INT_8) 1
+                                 else                    4
 
         mCPUHourGlass = ImageClassifierFloatInception.create(
                 activity, imageSizeX = picWidth, imageSizeY = picHeight,
@@ -200,16 +210,19 @@ class PETaskScheduler(private val activity: Activity) {
         }
 
         Log.i(TAG, "Init TFLite OK" +
-                "(numThreads=$numThreads, useCpuFp8=$useCpuFp8, useCpuFp16=$useCpuFp16," +
+                "(numThreads=$numThreads, cpuFp=$cpuFp, " +
                 " useGpuModelFp16=$useGpuModelFp16, useGpuFp16=$useGpuFp16)")
     }
 
     private fun closeTFLite() {
         mCPUHourGlass?.close()
         mGPUHourGlass?.close()
-        for (model in mCPUHourGlassT2) {
+        //for (model in mCPUHourGlassT2)
+        //    model.close()
+        for (model in mCPUHourGlassMT[1])
             model.close()
-        }
+        for (model in mCPUHourGlassMT[3])
+            model.close()
     }
 
     private fun warmUpRun() {
@@ -239,10 +252,10 @@ class PETaskScheduler(private val activity: Activity) {
     }
 
     fun init(inputSize: Int, numThreads: Int,
-                    useCpuFp8: Boolean, useCpuFp16: Boolean, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
+             cpuFp: Int, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
         this.picWidth = inputSize
         this.picHeight = inputSize
-        initTFLite(numThreads, useCpuFp8, useCpuFp16, useGpuModelFp16, useGpuFp16)
+        initTFLite(numThreads, cpuFp, useGpuModelFp16, useGpuFp16)
         //warmUpRun()
     }
 
@@ -255,30 +268,13 @@ class PETaskScheduler(private val activity: Activity) {
     @Synchronized private fun processResult() {
         val pointArrays = ArrayList<Array<FloatArray>>()
 
-        /*****
-        if (cpuPointArrayQueue.size > 0) {
-            pointArrays.addAll(cpuPointArrayQueue[0])
-            cpuPointArrayQueue.removeAt(0)
-        }
-        if (gpuPointArrayQueue.size > 0) {
-            pointArrays.addAll(gpuPointArrayQueue[0])
-            gpuPointArrayQueue.removeAt(0)
-        }
-        *****/
+        val cpuPointArrays = cpuPointArraysQueue.dequeue()
+        if (cpuPointArrays != null)
+            pointArrays.addAll(cpuPointArrays)
 
-        val cpuPointArrays = cpuPointArrayQueue.dequeue()
-        if (cpuPointArrays != null) {
-            for (array in cpuPointArrays) {
-                pointArrays.add(array)
-            }
-        }
-
-        val gpuPointArrays = gpuPointArrayQueue.dequeue()
-        if (gpuPointArrays != null) {
-            for (array in gpuPointArrays) {
-                pointArrays.add(array)
-            }
-        }
+        val gpuPointArrays = gpuPointArraysQueue.dequeue()
+        if (gpuPointArrays != null)
+            pointArrays.addAll(gpuPointArrays)
 
         // Start a new thread for PETaskCallback
         //heatMapsThreadHandler?.post {
@@ -335,6 +331,7 @@ class PETaskScheduler(private val activity: Activity) {
             processResult()
     }
 
+    /*****
     private fun parallelClassifyFrameT2(b0: Bitmap, b1: Bitmap): ArrayList<Array<FloatArray>> {
         val tempOutArray = Array(2) { Array(2) { FloatArray(14) } }
         val lock: Byte = 0
@@ -342,9 +339,9 @@ class PETaskScheduler(private val activity: Activity) {
 
         threadPool.submit {
             mCPUHourGlassT2[1].classifyFrame(b1)
-            val pa = mCPUHourGlassT2[1].getPointArray()
+            val pa = mCPUHourGlassT2[1].getCopyPointArray()
             if (pa != null)
-                tempOutArray[1] = pa.clone()
+                tempOutArray[1] = pa
 
             synchronized(lock) {
                 countDown --
@@ -352,23 +349,23 @@ class PETaskScheduler(private val activity: Activity) {
         }
 
         mCPUHourGlassT2[0].classifyFrame(b0)
-        val pa = mCPUHourGlassT2[0].getPointArray()
+        val pa = mCPUHourGlassT2[0].getCopyPointArray()
         if (pa != null)
-            tempOutArray[0] = pa.clone()
+            tempOutArray[0] = pa
 
         synchronized(lock) {
             countDown --
         }
 
-        while (countDown > 0) {
-            sleep(1)
-        }
+        // Wait other threads
+        while (countDown > 0) { sleep(1) }
 
         val output = ArrayList<Array<FloatArray>>()
         output.addAll(tempOutArray)
 
         return output
     }
+    *****/
 
     private fun parallelClassifyFrame(numThreads: Int, bitmaps: ArrayList<Bitmap>):
                     ArrayList<Array<FloatArray>> {
@@ -379,9 +376,9 @@ class PETaskScheduler(private val activity: Activity) {
         for (i in 1 until numThreads) {
             threadPool.submit {
                 mCPUHourGlassMT[numThreads - 1][i].classifyFrame(bitmaps[i])
-                val pa = mCPUHourGlassMT[numThreads - 1][i].getPointArray()
+                val pa = mCPUHourGlassMT[numThreads - 1][i].getCopyPointArray()
                 if (pa != null)
-                    tempOutArray[i] = pa.clone()
+                    tempOutArray[i] = pa
 
                 synchronized(lock) {
                     countDown --
@@ -390,17 +387,16 @@ class PETaskScheduler(private val activity: Activity) {
         }
 
         mCPUHourGlassMT[numThreads - 1][0].classifyFrame(bitmaps[0])
-        val pa = mCPUHourGlassMT[numThreads - 1][0].getPointArray()
+        val pa = mCPUHourGlassMT[numThreads - 1][0].getCopyPointArray()
         if (pa != null)
-            tempOutArray[0] = pa.clone()
+            tempOutArray[0] = pa
 
         synchronized(lock) {
             countDown --
         }
 
-        while (countDown > 0) {
-            sleep(1)
-        }
+        // Wait other threads
+        while (countDown > 0) { sleep(1) }
 
         val output = ArrayList<Array<FloatArray>>()
         output.addAll(tempOutArray)
@@ -410,11 +406,10 @@ class PETaskScheduler(private val activity: Activity) {
 
     private fun cpuProcessBitmapT1(bitmaps: ArrayList<Bitmap>,
                                    pointArrays: ArrayList<Array<FloatArray>>) {
-        val bitmap = bitmaps[0]
-        mCPUHourGlass?.classifyFrame(bitmap)
-        bitmaps.remove(bitmap)
+        mCPUHourGlass?.classifyFrame(bitmaps[0])
+        bitmaps.removeAt(0)
 
-        val pointArray = mCPUHourGlass?.getPointArray()?.clone()
+        val pointArray = mCPUHourGlass?.getCopyPointArray()
         pointArrays.add(pointArray!!)
     }
 
@@ -434,11 +429,11 @@ class PETaskScheduler(private val activity: Activity) {
                 setIsGPURunning(true)
 
                 while (gpuTasksQueue.getQueueSize() > 0) {
-                    val gpuBitmaps = gpuTasksQueue.getFirstTasks()
+                    val gpuBitmaps = gpuTasksQueue.getFirstTasksItem()
 
                     val gpuPointArrays = ArrayList<Array<FloatArray>>()
 
-                    while (gpuBitmaps.size > 0) {
+                    while (gpuBitmaps != null && gpuBitmaps.size > 0) {
                         //Log.i(TAG, "GPU classify frame $i")
                         val startTime = System.currentTimeMillis()
                         mGPUHourGlass?.classifyFrame(gpuBitmaps[0])
@@ -448,14 +443,14 @@ class PETaskScheduler(private val activity: Activity) {
 
                         gpuBitmaps.removeAt(0)
 
-                        val pointArray = mGPUHourGlass?.getPointArray()?.clone()
+                        val pointArray = mGPUHourGlass?.getCopyPointArray()
                         //if (pointArray != null)
                         gpuPointArrays.add(pointArray!!)
                     }
 
-                    gpuPointArrayQueue.enqueue(gpuPointArrays)
+                    gpuPointArraysQueue.enqueue(gpuPointArrays)
 
-                    gpuTasksQueue.dequeueFirstTasks()
+                    gpuTasksQueue.dequeue()
 
                     if (curScheduleMode >= MODE_CPUGPU)
                         addOrRemoveTaskFinishedFlag(FLAG_GPU_TASK_FINISH)
@@ -478,27 +473,26 @@ class PETaskScheduler(private val activity: Activity) {
                     // Run CPU thread
                     val cpuPointArrays = ArrayList<Array<FloatArray>>()
 
-                    val cpuBitmaps = cpuTasksQueue.getFirstTasks()
+                    val cpuBitmaps = cpuTasksQueue.getFirstTasksItem()
 
-                    while (cpuBitmaps.size > 0) {
+                    while (cpuBitmaps != null && cpuBitmaps.size > 0) {
                         //Log.i(TAG, "CPU classify frame $i")
                         //Log.i(TAG, "CPU left ${cpuBitmaps.size} bitmaps")
 
-                        val useMultiThreadParallel = false
-
-                        if (useMultiThreadParallel && cpuBitmaps.size >= 4) {
+                        if (useMultiThreadModel && cpuBitmaps.size >= 4) {
                             //Log.i(TAG, "CPU take 4 bitmaps")
                             val startTime = System.currentTimeMillis()
                             val outPointArrays = parallelClassifyFrame(4, cpuBitmaps)
                             val costTime = System.currentTimeMillis() - startTime
 
-                            for (i in 0 until 4) cpuBitmaps.removeAt(0)
+                            for (i in 0 until 4)
+                                cpuBitmaps.removeAt(0)
 
                             cpuPointArrays.addAll(outPointArrays)
 
                             onDeviceEvaluator.updateDeviceExecTime(
                                     OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4, costTime.toFloat())
-                        } else if (useMultiThreadParallel && cpuBitmaps.size >= 3) {
+                        } else if (useMultiThreadModel && cpuBitmaps.size >= 3) {
                             //Log.i(TAG, "CPU take 3 bitmaps")
                             val startTime = System.currentTimeMillis()
                             cpuProcessBitmapT2(cpuBitmaps, cpuPointArrays)
@@ -507,7 +501,7 @@ class PETaskScheduler(private val activity: Activity) {
 
                             onDeviceEvaluator.updateDeviceExecTime(
                                     OnDeviceEvaluator.DEVICE_ID_CPU_MT, 3, costTime.toFloat())
-                        } else if (useMultiThreadParallel && cpuBitmaps.size >= 2) {
+                        } else if (useMultiThreadModel && cpuBitmaps.size >= 2) {
                             //Log.i(TAG, "CPU take 2 bitmaps")
                             val startTime = System.currentTimeMillis()
                             cpuProcessBitmapT2(cpuBitmaps, cpuPointArrays)
@@ -526,9 +520,9 @@ class PETaskScheduler(private val activity: Activity) {
                         }
                     }
 
-                    cpuPointArrayQueue.enqueue(cpuPointArrays)
+                    cpuPointArraysQueue.enqueue(cpuPointArrays)
 
-                    cpuTasksQueue.dequeueFirstTasks()
+                    cpuTasksQueue.dequeue()
 
                     if (curScheduleMode >= MODE_CPUGPU)
                         addOrRemoveTaskFinishedFlag(FLAG_CPU_TASK_FINISH)
@@ -545,34 +539,7 @@ class PETaskScheduler(private val activity: Activity) {
         sleep(10)
     }
 
-    fun scheduleAndRun(pictures: ArrayList<Bitmap>, mode: Int): Long {
-
-        //Log.d(TAG, "PE tasks come")
-
-        curScheduleMode = mode
-        var ticket = -1L
-
-        when (curScheduleMode) {
-            MODE_CPU -> {
-                scheduleOnCPU(pictures)
-            }
-            MODE_GPU -> {
-                scheduleOnGPU(pictures)
-            }
-            MODE_CPUGPU -> {
-                ticket = scheduleOnCPUGPU(pictures, false)
-            }
-            MODE_CPUGPU_WMA -> {
-                ticket = scheduleOnCPUGPU(pictures, true)
-            }
-        }
-
-        runTaskIfNot()
-
-        return ticket
-    }
-
-    private fun scheduleOnCPUGPU(pictures: ArrayList<Bitmap>, useWMA: Boolean): Long {
+    private fun scheduleOnCPUGPU(pictures: ArrayList<Bitmap>, useWMA: Boolean) {
         //val peTaskEndTime = getPETaskTimeEnd()
 
         val cpuTaskSize = cpuTasksQueue.getTotalTasksSize()
@@ -624,19 +591,13 @@ class PETaskScheduler(private val activity: Activity) {
                 cpuTaskCount, gpuTaskCount))
 
         // Enqueue tasks
-        for (i in 0 until cpuTaskCount) {
+        for (i in 0 until cpuTaskCount)
             cpuQueue.add(pictures[i])
-        }
-        for (i in cpuTaskCount until pictures.size) {
+        for (i in cpuTaskCount until pictures.size)
             gpuQueue.add(pictures[i])
-        }
 
-        cpuTasksQueue.enqueueTasks(cpuQueue)
-        gpuTasksQueue.enqueueTasks(gpuQueue)
-
-        val ticket = System.currentTimeMillis()
-        outputTicketQueue.enqueue(ticket)
-        return ticket
+        cpuTasksQueue.enqueue(cpuQueue)
+        gpuTasksQueue.enqueue(gpuQueue)
     }
 
     private fun evaluateCPUTaskEndTime(numCPU: Int, useWMA: Boolean): Float {
@@ -646,32 +607,64 @@ class PETaskScheduler(private val activity: Activity) {
         // Estimate task end time in CPU tasks queue
         for (i in 0 until cpuTasksQueue.getQueueSize()) {
             val tasksItem = cpuTasksQueue.getTasksItem(i)
-            val t4Count = tasksItem.size / 4
-            if (useWMA) {
-                endTime += t4Count * onDeviceEvaluator.getDeviceEstimatedExecTime(
-                        OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4)
-                endTime += onDeviceEvaluator.getDeviceEstimatedExecTime(
-                        OnDeviceEvaluator.DEVICE_ID_CPU_MT, tasksItem.size % 4)
-            } else {
-                endTime += t4Count * onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
-                        OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4)
-                endTime += onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
-                        OnDeviceEvaluator.DEVICE_ID_CPU_MT, tasksItem.size % 4)
+            if (tasksItem != null) {
+                val t4Count = tasksItem.size / 4
+                val remainedCount = tasksItem.size % 4
+                if (useWMA) {
+                    endTime += t4Count * onDeviceEvaluator.getDeviceEstimatedExecTime(
+                            OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4)
+                    if (remainedCount > 0) {
+                        endTime += if (remainedCount == 1) {
+                            onDeviceEvaluator.getDeviceEstimatedExecTime(
+                                    OnDeviceEvaluator.DEVICE_ID_CPU)
+                        } else {
+                            onDeviceEvaluator.getDeviceEstimatedExecTime(
+                                    OnDeviceEvaluator.DEVICE_ID_CPU_MT, remainedCount)
+                        }
+                    }
+                } else {
+                    endTime += t4Count * onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
+                            OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4)
+                    if (remainedCount > 0) {
+                        endTime += if (remainedCount == 1) {
+                            onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
+                                    OnDeviceEvaluator.DEVICE_ID_CPU)
+                        } else {
+                            onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
+                                    OnDeviceEvaluator.DEVICE_ID_CPU_MT, tasksItem.size % 4)
+                        }
+                    }
+                }
             }
         }
 
         // Estimate task end time after put new tasks in CPU tasks queue
         val t4Count = numCPU / 4
+        val remainedNumCPU = numCPU % 4
         if (useWMA) {
             endTime += t4Count * onDeviceEvaluator.getDeviceEstimatedExecTime(
                     OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4)
-            endTime += onDeviceEvaluator.getDeviceEstimatedExecTime(
-                    OnDeviceEvaluator.DEVICE_ID_CPU_MT, numCPU % 4)
+            if (remainedNumCPU > 0) {
+                endTime += if (remainedNumCPU == 1) {
+                    onDeviceEvaluator.getDeviceEstimatedExecTime(
+                            OnDeviceEvaluator.DEVICE_ID_CPU)
+                } else {
+                    onDeviceEvaluator.getDeviceEstimatedExecTime(
+                            OnDeviceEvaluator.DEVICE_ID_CPU_MT, remainedNumCPU)
+                }
+            }
         } else {
             endTime += t4Count * onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
                     OnDeviceEvaluator.DEVICE_ID_CPU_MT, 4)
-            endTime += onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
-                    OnDeviceEvaluator.DEVICE_ID_CPU_MT, numCPU % 4)
+            if (remainedNumCPU > 0) {
+                endTime += if (remainedNumCPU == 1) {
+                    onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
+                            OnDeviceEvaluator.DEVICE_ID_CPU)
+                } else {
+                    onDeviceEvaluator.getStaticDeviceEstimatedExecTime(
+                            OnDeviceEvaluator.DEVICE_ID_CPU_MT, remainedNumCPU)
+                }
+            }
         }
 
         return endTime
@@ -697,7 +690,7 @@ class PETaskScheduler(private val activity: Activity) {
         return cpuTaskEndTime.coerceAtLeast(gpuTaskEndTime)
     }
 
-    private fun scheduleOnCPUGPULOP(pictures: ArrayList<Bitmap>, useWMA: Boolean): Long {
+    private fun scheduleOnCPUGPUMT(pictures: ArrayList<Bitmap>, useWMA: Boolean) {
 
         var minCompletionTime = Float.MAX_VALUE
         var bestNumCPU = pictures.size
@@ -714,37 +707,70 @@ class PETaskScheduler(private val activity: Activity) {
             }
         }
 
+        Log.d(TAG, "Schedule CPU $bestNumCPU GPU ${pictures.size - bestNumCPU} tasks")
+
         // Enqueue tasks
         val cpuQueue = ArrayList<Bitmap>()
         val gpuQueue = ArrayList<Bitmap>()
 
-        for (i in 0 until bestNumCPU) {
+        for (i in 0 until bestNumCPU)
             cpuQueue.add(pictures[i])
-        }
-        for (i in bestNumCPU until pictures.size) {
+        for (i in bestNumCPU until pictures.size)
             gpuQueue.add(pictures[i])
-        }
 
-        cpuTasksQueue.enqueueTasks(cpuQueue)
-        gpuTasksQueue.enqueueTasks(gpuQueue)
-
-        val ticket = System.currentTimeMillis()
-        outputTicketQueue.enqueue(ticket)
-        return ticket
+        cpuTasksQueue.enqueue(cpuQueue)
+        gpuTasksQueue.enqueue(gpuQueue)
     }
 
     private fun scheduleOnCPU(pictures: ArrayList<Bitmap>) {
         val cpuTasks = ArrayList<Bitmap>()
         for (picture in pictures)
             cpuTasks.add(picture)
-        cpuTasksQueue.enqueueTasks(cpuTasks)
+        cpuTasksQueue.enqueue(cpuTasks)
     }
 
     private fun scheduleOnGPU(pictures: ArrayList<Bitmap>) {
         val gpuTasks = ArrayList<Bitmap>()
         for (picture in pictures)
             gpuTasks.add(picture)
-        gpuTasksQueue.enqueueTasks(gpuTasks)
+        gpuTasksQueue.enqueue(gpuTasks)
     }
 
+    fun scheduleAndRun(pictures: ArrayList<Bitmap>, mode: Int): Long {
+
+        //Log.d(TAG, "PE tasks come")
+
+        curScheduleMode = mode
+        useMultiThreadModel = (curScheduleMode == MODE_CPUGPU_MT ||
+                               curScheduleMode == MODE_CPUGPU_MT_WMA)
+
+        when (curScheduleMode) {
+            MODE_CPU -> {
+                scheduleOnCPU(pictures)
+            }
+            MODE_GPU -> {
+                scheduleOnGPU(pictures)
+            }
+            MODE_CPUGPU -> {
+                scheduleOnCPUGPU(pictures, false)
+            }
+            MODE_CPUGPU_WMA -> {
+                scheduleOnCPUGPU(pictures, true)
+            }
+            MODE_CPUGPU_MT -> {
+                scheduleOnCPUGPUMT(pictures, false)
+            }
+            MODE_CPUGPU_MT_WMA -> {
+                scheduleOnCPUGPUMT(pictures, true)
+            }
+        }
+
+        runTaskIfNot()
+
+        // Create a ticket for tasks owner
+        val ticket = System.currentTimeMillis()
+        outputTicketQueue.enqueue(ticket)
+
+        return ticket
+    }
 }

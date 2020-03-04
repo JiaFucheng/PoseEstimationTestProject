@@ -29,8 +29,17 @@ class ImageClassifierFloatInception private constructor(
 
     private var mPrintPointArray: Array<FloatArray>? = null
 
-    public fun getPointArray(): Array<FloatArray>? {
+    fun getPointArray(): Array<FloatArray>? {
         return mPrintPointArray
+    }
+
+    fun getCopyPointArray(): Array<FloatArray>? {
+        val outPointArray = Array (2) { FloatArray(14) }
+        if (mPrintPointArray != null) {
+            outPointArray[0] = mPrintPointArray!![0].copyOf()
+            outPointArray[1] = mPrintPointArray!![1].copyOf()
+        }
+        return outPointArray
     }
 
     override fun addPixelValue(pixelValue: Int) {
@@ -105,7 +114,7 @@ class ImageClassifierFloatInception private constructor(
 
             var maxX = 0f
             var maxY = 0f
-            var max = 0f
+            var max = Float.MIN_VALUE
 
             // Find keypoint coordinate through maximum values
             for (x in 0 until outputW) {
@@ -119,18 +128,22 @@ class ImageClassifierFloatInception private constructor(
                 }
             }
 
-            if (max == 0f) {
+            if (max != Float.MIN_VALUE) {
+                mPrintPointArray!![0][i] = maxX
+                mPrintPointArray!![1][i] = maxY
+            } else {
                 //mPrintPointArray = Array(2) { FloatArray(14) }
                 //return
                 mPrintPointArray!![0][i] = 0.0f
                 mPrintPointArray!![1][i] = 0.0f
-            } else {
-                mPrintPointArray!![0][i] = maxX
-                mPrintPointArray!![1][i] = maxY
             }
 
             //Log.i("TestOutPut", "pic[$i] ($maxX,$maxY) $max")
         }
+
+        //val pointArrayX = mPrintPointArray!![0]
+        //val pointArrayY = mPrintPointArray!![1]
+        //Log.d("PointArray", "[${Arrays.toString(pointArrayX)},[${Arrays.toString(pointArrayY)}]")
     }
 
     private operator fun get(

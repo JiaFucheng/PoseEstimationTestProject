@@ -6,25 +6,31 @@ class PETasksQueue {
     private val tasksQueue = ArrayList<ArrayList<Bitmap>>()
     private val queueLock: Byte = 0
 
-    public fun getFirstTasks(): ArrayList<Bitmap> {
+    fun getFirstTasksItem(): ArrayList<Bitmap>? {
         synchronized(queueLock) {
-            return tasksQueue[0]
+            if (tasksQueue.size > 0)
+                return tasksQueue[0]
+            else
+                return null
         }
     }
 
-    public fun getTasksItem(index: Int): ArrayList<Bitmap> {
+    fun getTasksItem(index: Int): ArrayList<Bitmap>? {
         synchronized(queueLock) {
-            return tasksQueue[index]
+            if (index < tasksQueue.size)
+                return tasksQueue[index]
+            else
+                return null
         }
     }
 
-    public fun getQueueSize(): Int {
+    fun getQueueSize(): Int {
         synchronized(queueLock) {
             return tasksQueue.size
         }
     }
 
-    public fun getTotalTasksSize(): Int {
+    fun getTotalTasksSize(): Int {
         var tasksSize = 0
 
         synchronized(queueLock) {
@@ -36,15 +42,16 @@ class PETasksQueue {
         return tasksSize
     }
 
-    public fun enqueueTasks(tasks: ArrayList<Bitmap>) {
+    fun enqueue(tasks: ArrayList<Bitmap>) {
         synchronized(queueLock) {
             tasksQueue.add(tasks)
         }
     }
 
-    public fun dequeueFirstTasks() {
+    fun dequeue() {
         synchronized(queueLock) {
-            tasksQueue.removeAt(0)
+            if (tasksQueue.size > 0)
+                tasksQueue.removeAt(0)
         }
     }
 }

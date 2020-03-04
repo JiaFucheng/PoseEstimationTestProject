@@ -9,7 +9,7 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
 
-import com.example.poseestimationapplication.peschedule.PETaskScheduler;
+import com.example.poseestimationapplication.peschedule.PETaskSchedulerWrapper;
 import com.example.poseestimationapplication.tool.BitmapLoader;
 
 import java.util.ArrayList;
@@ -19,7 +19,10 @@ public class PETestActivity2 extends AppCompatActivity {
 
     private String TAG = "PETestActivity2";
 
-    private PETaskScheduler mPETaskScheduler = new PETaskScheduler(this);
+    private PETaskSchedulerWrapper mPETaskSchedulerWrapper;
+
+    private int frameCount = 0;
+    private long lastFrameTime = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,14 +40,16 @@ public class PETestActivity2 extends AppCompatActivity {
             }
         });
 
-        initTaskPEScheduler();
+        // 创建Scheduler
+        mPETaskSchedulerWrapper = new PETaskSchedulerWrapper(this);
 
-        for (int i = 0; i < 5; i ++) {
+        int testFrameCount = 100;
+        for (int i = 0; i < testFrameCount; i ++) {
             new Thread() {
                 @Override
                 public void run() {
                     super.run();
-                    callTaskPEScheduler();
+                    callTaskPESchedulerExample();
                 }
             }.start();
 
@@ -54,40 +59,24 @@ public class PETestActivity2 extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
-    }
 
-    // 初始化Scheduler
-    private void initTaskPEScheduler() {
-        int inputSize = 192;
-        int numThreads = 4;
-        boolean useCpuFp8 = false;
-        boolean useCpuFp16 = false;
-        boolean useGpuModelFp16 = false;
-        boolean useGpuFp16 = false;
-        mPETaskScheduler.init(inputSize, numThreads, useCpuFp8, useCpuFp16, useGpuModelFp16, useGpuFp16);
+        lastFrameTime = System.currentTimeMillis();
     }
 
     // 调用Scheduler
-    private void callTaskPEScheduler() {
+    private void callTaskPESchedulerExample() {
         // 假设bitmaps是框出的human的图片
         // 假设图片数量是5，图片大小是192x192
-        ArrayList<Bitmap> bitmaps = BitmapLoader.Companion.loadRandomDataPictures(5, 192, 192);
+        ArrayList<Bitmap> bitmaps = BitmapLoader.Companion.loadAssetsPictures(this, 5);
 
-        // 调用Scheduler进行调度和执行Human Bitmaps
-       long ticket = mPETaskScheduler.scheduleAndRun(bitmaps, PETaskScheduler.MODE_CPUGPU_WMA);
+        // 调用Scheduler进行调度和执行任务
+        ArrayList<float[][]> pointArrays = mPETaskSchedulerWrapper.run(bitmaps);
 
-        ArrayList<float[][]> pointArrays = null;
+        // 打印Point Arrays的数量，应该是5个
+        Log.i(TAG, "Get point arrays size " + pointArrays.size());
 
-        // 当获取pointArrays为null时，说明scheduler中的任务还没有完成
-        // 因此需要while循环等待直到pointArrays不为null
-        while ((pointArrays = mPETaskScheduler.getOutputPointArrays(ticket)) == null);
-
-        Log.i(TAG, "Get point arrays size " + pointArrays.size()
-                + " ticket " + ticket);
-
-        // 对获取得到的pointArrays进行处理
+        // 对获取得到的Point Arrays进行处理
         // pointArrays[图片下标,2个x/y坐标,14个点]
-        // TODO(xiaohui): Process point arrays here
         for (int picIndex = 0; picIndex < pointArrays.size(); picIndex ++) {
             if (pointArrays.get(picIndex) != null) {
                 for (int i = 0; i < 2; i++) {
@@ -97,9 +86,15 @@ public class PETestActivity2 extends AppCompatActivity {
                 }
                 Log.i(TAG, "Array " + picIndex + ": " + Arrays.deepToString(pointArrays.get(picIndex)));
             } else {
-                Log.i(TAG, "Arrays " + picIndex + " is null");
+                Log.i(TAG, "Array " + picIndex + " is null");
             }
         }
+
+        Log.i(TAG,
+                "Frame Count " + frameCount
+                + " Time " + (System.currentTimeMillis() - lastFrameTime) + " ms");
+        frameCount ++;
+        lastFrameTime = System.currentTimeMillis();
     }
 
     @Override
@@ -107,6 +102,6 @@ public class PETestActivity2 extends AppCompatActivity {
         super.onDestroy();
 
         // 关闭Scheduler
-        mPETaskScheduler.close();
+        mPETaskSchedulerWrapper.close();
     }
 }

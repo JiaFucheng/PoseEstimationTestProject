@@ -3,6 +3,7 @@ package com.example.poseestimationapplication
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.widget.*
+import com.example.poseestimationapplication.peschedule.PETaskScheduler
 
 class PETestActivity : AppCompatActivity() {
 
@@ -48,10 +49,14 @@ class PETestActivity : AppCompatActivity() {
             val useGpuModelFp16 = getUseGpuModelFp16FromRadioGroup(gpuModelFpRadioGroup)
             val useGpuFp16 = getUseGpuFp16FromRadioGroup(gpuFpRadioGroup)
 
+            val cpuFp = if (useCpuFp8) PETaskScheduler.CPU_INT_8
+                        else if (useCpuFp16) PETaskScheduler.CPU_FP_16
+                        else PETaskScheduler.CPU_FP_32
+
             //PETestTask(this).start()
             PETestTask(this).test(
                     rounds, frames, frameInterval, picNum,
-                    mode, numThreads, useCpuFp8, useCpuFp16, useGpuModelFp16, useGpuFp16)
+                    mode, numThreads, cpuFp, useGpuModelFp16, useGpuFp16)
 
             showTestStartToast()
         }

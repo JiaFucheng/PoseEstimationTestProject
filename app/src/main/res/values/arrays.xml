@@ -4,7 +4,9 @@
         <item>CPU</item>
         <item>GPU</item>
         <item>CPU-GPU</item>
-        <item>CPU-GPU (WMA)</item>
+        <item>CPU-GPU-WMA</item>
+        <item>CPU-GPU-MT</item>
+        <item>CPU-GPU-MT-WMA</item>
     </string-array>
 
     <string-array name="num_threads">

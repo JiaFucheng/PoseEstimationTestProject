@@ -1,6 +1,7 @@
 package com.example.poseestimationapplication.peschedule
 
 import android.util.Log
+import java.util.*
 import kotlin.collections.ArrayList
 
 class OnDeviceEvaluator {
@@ -8,19 +9,20 @@ class OnDeviceEvaluator {
     private val TAG = "OnDeviceEvaluator"
 
     companion object {
-        public val DEVICE_ID_CPU = 0
-        public val DEVICE_ID_GPU = 1
-        public val DEVICE_ID_CPU_MT = 2
+        const val DEVICE_ID_CPU = 0
+        const val DEVICE_ID_GPU = 1
+        const val DEVICE_ID_CPU_MT = 2
 
         private val deviceTimeWndWeights = ArrayList<Float>()
     }
 
-    private val NUM_DEVICE = 2
+    //private val NUM_DEVICE = 2
     private val SIZE_AVG_WINDOW = 3
 
     private val avgDeviceTime = floatArrayOf(0.0f, 0.0f)
-    private val deviceTimeWindow = ArrayList<ArrayList<Float>>(2)
-    private val deviceTimeWindowMT = ArrayList<ArrayList<Float>>(4)
+    private val avgDeviceTimeMT = floatArrayOf(0.0f, 0.0f, 0.0f, 0.0f)
+    private val deviceTimeWindow = ArrayList<ArrayList<Float>>()
+    private val deviceTimeWindowMT = ArrayList<ArrayList<Float>>()
     private val deviceTimeUpdatedTime = longArrayOf(1L, 1L)
     private val deviceTimeUpdatedTimeMT = longArrayOf(1L, 1L, 1L, 1L)
     private val deviceTimeGetTime = longArrayOf(0L, 0L)
@@ -51,30 +53,46 @@ class OnDeviceEvaluator {
                 + " GPU " + deviceTimeWindow[DEVICE_ID_GPU].toString())
     }
 
+    private fun showDeviceTimeWindowMT() {
+        Log.i(TAG, "CPU $deviceTimeWindowMT")
+        Log.i(TAG, "AVG CPU " + Arrays.toString(avgDeviceTimeMT))
+    }
+
+    private fun computeDeviceAvgTimeMT(numThreads: Int) {
+        val timeCount = deviceTimeWindowMT[numThreads-1].size
+        var sum = 0.0f
+        for (i in 0 until timeCount) {
+            sum += (deviceTimeWindowMT[numThreads-1][i] * deviceTimeWndWeights[i])
+        }
+        avgDeviceTimeMT[numThreads-1] = sum
+    }
+
     // 计算加权平均时间
     private fun computeDeviceAvgTime(deviceId: Int, numThreads: Int) {
+        if (deviceId == DEVICE_ID_CPU_MT) {
+            computeDeviceAvgTimeMT(numThreads)
+            return
+        }
+
         val timeCount = deviceTimeWindow[deviceId].size
         var sum = 0.0f
         for (i in 0 until timeCount) {
             // 根据加权平均方法计算加权平均时间
-            if (deviceId == DEVICE_ID_CPU_MT)
-                sum += (deviceTimeWindowMT[numThreads][i] * deviceTimeWndWeights[i])
-            else
-                sum += (deviceTimeWindow[deviceId][i] * deviceTimeWndWeights[i])
+            sum += (deviceTimeWindow[deviceId][i] * deviceTimeWndWeights[i])
         }
 
         avgDeviceTime[deviceId] = sum
     }
 
     // 更新执行时间
-    public fun updateDeviceExecTime(deviceId: Int, numThreads: Int, execTime: Float) {
+    fun updateDeviceExecTime(deviceId: Int, numThreads: Int, execTime: Float) {
         synchronized(rwLock) {
             if (deviceId == DEVICE_ID_CPU_MT) {
-                deviceTimeWindowMT[numThreads].add(execTime)
-                if (deviceTimeWindowMT[numThreads].size > SIZE_AVG_WINDOW) {
-                    deviceTimeWindowMT[numThreads].removeAt(0)
+                deviceTimeWindowMT[numThreads-1].add(execTime)
+                if (deviceTimeWindowMT[numThreads-1].size > SIZE_AVG_WINDOW) {
+                    deviceTimeWindowMT[numThreads-1].removeAt(0)
                 }
-                deviceTimeUpdatedTimeMT[numThreads] = System.currentTimeMillis()
+                deviceTimeUpdatedTimeMT[numThreads-1] = System.currentTimeMillis()
             } else {
                 deviceTimeWindow[deviceId].add(execTime)
                 if (deviceTimeWindow[deviceId].size > SIZE_AVG_WINDOW) {
@@ -85,22 +103,31 @@ class OnDeviceEvaluator {
         }
     }
 
-    public fun updateDeviceExecTime(deviceId: Int, execTime: Float) {
+    fun updateDeviceExecTime(deviceId: Int, execTime: Float) {
         return updateDeviceExecTime(deviceId, 1, execTime)
     }
 
     // 获取预估执行时间
-    public fun getDeviceEstimatedExecTime(deviceId: Int, numThreads: Int) : Float {
-        return if (deviceTimeWindow[deviceId].size < SIZE_AVG_WINDOW) {
-            getStaticDeviceEstimatedExecTime(deviceId, numThreads)
-        } else {
-            synchronized(rwLock) {
-                if (deviceId == DEVICE_ID_CPU_MT) {
-                    if (deviceTimeGetTimeMT[numThreads] < deviceTimeUpdatedTimeMT[numThreads]) {
+    fun getDeviceEstimatedExecTime(deviceId: Int, numThreads: Int) : Float {
+        if (deviceId == DEVICE_ID_CPU_MT) {
+            return if (deviceTimeWindowMT[numThreads-1].size < SIZE_AVG_WINDOW) {
+                getStaticDeviceEstimatedExecTime(deviceId, numThreads)
+            } else {
+                synchronized(rwLock) {
+                    if (deviceTimeGetTimeMT[numThreads-1] < deviceTimeUpdatedTimeMT[numThreads-1]) {
+                        //showDeviceTimeWindowMT()
                         computeDeviceAvgTime(deviceId, numThreads)
-                        deviceTimeGetTimeMT[numThreads] = deviceTimeUpdatedTimeMT[numThreads]
+                        deviceTimeGetTimeMT[numThreads-1] = deviceTimeUpdatedTimeMT[numThreads-1]
                     }
-                } else {
+                }
+
+                avgDeviceTimeMT[numThreads-1]
+            }
+        } else {
+            return if (deviceTimeWindow[deviceId].size < SIZE_AVG_WINDOW) {
+                getStaticDeviceEstimatedExecTime(deviceId, numThreads)
+            } else {
+                synchronized(rwLock) {
                     if (deviceTimeGetTime[deviceId] < deviceTimeUpdatedTime[deviceId]) {
                         //showDeviceTimeWindow()
                         computeDeviceAvgTime(deviceId, numThreads)
@@ -108,26 +135,25 @@ class OnDeviceEvaluator {
                     }
                 }
 
+                avgDeviceTime[deviceId]
             }
-
-            avgDeviceTime[deviceId]
         }
     }
 
-    public fun getDeviceEstimatedExecTime(deviceId: Int): Float {
+    fun getDeviceEstimatedExecTime(deviceId: Int): Float {
         return getDeviceEstimatedExecTime(deviceId, 1)
     }
 
     // 获取预测的执行时间
-    public fun getStaticDeviceEstimatedExecTime(deviceId: Int, numThreads: Int) : Float {
-        if (deviceId == DEVICE_ID_CPU_MT) {
-            return deviceStaticExecuteTimeMT[numThreads]
+    fun getStaticDeviceEstimatedExecTime(deviceId: Int, numThreads: Int) : Float {
+        return if (deviceId == DEVICE_ID_CPU_MT) {
+            deviceStaticExecuteTimeMT[numThreads-1]
         } else {
-            return deviceStaticExecuteTime[deviceId]
+            deviceStaticExecuteTime[deviceId]
         }
     }
 
-    public fun getStaticDeviceEstimatedExecTime(deviceId: Int) : Float {
+    fun getStaticDeviceEstimatedExecTime(deviceId: Int) : Float {
         return getStaticDeviceEstimatedExecTime(deviceId, 1)
     }
 }

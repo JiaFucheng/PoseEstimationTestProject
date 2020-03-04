@@ -3,6 +3,7 @@ package com.example.poseestimationapplication
 import android.app.Activity
 import android.graphics.Bitmap
 import android.util.Log
+import com.example.poseestimationapplication.peschedule.PETaskScheduler
 import com.example.poseestimationapplication.tflite.ImageClassifierFloatInception
 import com.example.poseestimationapplication.tool.BitmapLoader
 import java.util.concurrent.ExecutorService
@@ -18,6 +19,17 @@ class PECPUThreadTestTask(private val activity: Activity) {
 
     private var cpuPEModels = ArrayList<ImageClassifierFloatInception>()
 
+    private var round = 10
+    private var cpuFp = PETaskScheduler.CPU_FP_32
+
+    public fun setCpuFp(cpuFp: Int) {
+        this.cpuFp = cpuFp
+    }
+
+    public fun setRound(round: Int) {
+        this.round = round
+    }
+
     public fun startTask1() {
         Thread {
             task1()
@@ -30,6 +42,7 @@ class PECPUThreadTestTask(private val activity: Activity) {
         }.start()
     }
 
+    /* CPU Thread Number Test **/
     private fun task1() {
         val testParams = Array(8){IntArray(3)}
         var i = 0
@@ -47,6 +60,7 @@ class PECPUThreadTestTask(private val activity: Activity) {
         }
     }
 
+    /* CPU Thread Parallel Test **/
     private fun task2() {
         val testParams = Array(11){IntArray(3)}
         var i = 0
@@ -94,7 +108,6 @@ class PECPUThreadTestTask(private val activity: Activity) {
         // Run
         var timeSum = 0L
         val costTimeArray = ArrayList<Long>()
-        val round = 10
         for (i in 0 until round) {
             val startTime = System.currentTimeMillis()
             runTFLite(BitmapLoader.loadAssetsPictures(activity, taskCount))
@@ -113,9 +126,22 @@ class PECPUThreadTestTask(private val activity: Activity) {
     }
 
     private fun initPEModels(tfliteCount: Int, numThreads: Int) {
+        val modelPath = if (cpuFp == PETaskScheduler.CPU_FP_32)
+            "hourglass_model.tflite"
+        else if (cpuFp == PETaskScheduler.CPU_FP_16)
+            "hourglass_model_fp16.tflite"
+        else if (cpuFp == PETaskScheduler.CPU_INT_8)
+            "hourglass_model_fp8.tflite"
+        else
+            "hourglass_model.tflite"
+
+        val numBytesPerChannel =
+                if (cpuFp == PETaskScheduler.CPU_INT_8) 1
+                else                                    4
+
         for (i in 0 until tfliteCount) {
             val model = ImageClassifierFloatInception.create(
-                            activity, modelPath = "hourglass_model.tflite")
+                            activity, numBytesPerChannel = numBytesPerChannel, modelPath = modelPath)
             model.initTFLite(numThreads, false, false)
             cpuPEModels.add(model)
         }

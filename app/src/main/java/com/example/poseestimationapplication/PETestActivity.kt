@@ -65,12 +65,34 @@ class PETestActivity : AppCompatActivity() {
         val task2TestButton = findViewById<Button>(R.id.task2_test_button)
 
         task1TestButton.setOnClickListener {
-            PECPUThreadTestTask(this).startTask1()
+            val rounds = roundsEditText.text.toString().toInt()
+            val useCpuFp8 = getUseCpuFp8FromRadioGroup(cpuFpRadioGroup)
+            val useCpuFp16 = getUseCpuFp16FromRadioGroup(cpuFpRadioGroup)
+
+            val cpuFp = if (useCpuFp8) PETaskScheduler.CPU_INT_8
+                        else if (useCpuFp16) PETaskScheduler.CPU_FP_16
+                        else PETaskScheduler.CPU_FP_32
+
+            val task = PECPUThreadTestTask(this)
+            task.setRound(rounds)
+            task.setCpuFp(cpuFp)
+            task.startTask1()
             showTestStartToast()
         }
 
         task2TestButton.setOnClickListener {
-            PECPUThreadTestTask(this).startTask2()
+            val rounds = roundsEditText.text.toString().toInt()
+            val useCpuFp8 = getUseCpuFp8FromRadioGroup(cpuFpRadioGroup)
+            val useCpuFp16 = getUseCpuFp16FromRadioGroup(cpuFpRadioGroup)
+
+            val cpuFp = if (useCpuFp8) PETaskScheduler.CPU_INT_8
+                        else if (useCpuFp16) PETaskScheduler.CPU_FP_16
+                        else PETaskScheduler.CPU_FP_32
+
+            val task = PECPUThreadTestTask(this)
+            task.setRound(rounds)
+            task.setCpuFp(cpuFp)
+            task.startTask2()
             showTestStartToast()
         }
     }

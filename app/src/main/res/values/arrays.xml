@@ -7,6 +7,7 @@
         <item>CPU-GPU-WMA</item>
         <item>CPU-GPU-MT</item>
         <item>CPU-GPU-MT-WMA</item>
+        <item>CPU-GPU-GREEDY</item>
     </string-array>
 
     <string-array name="num_threads">

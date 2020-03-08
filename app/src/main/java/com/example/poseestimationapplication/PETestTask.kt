@@ -3,13 +3,15 @@ package com.example.poseestimationapplication
 import android.app.Activity
 import android.util.Log
 import com.example.poseestimationapplication.peschedule.PETaskScheduler
+import com.example.poseestimationapplication.peschedule.PETaskSchedulerMode
+import com.example.poseestimationapplication.peschedulev2.PETaskSchedulerV2
 import com.example.poseestimationapplication.tool.BitmapLoader
 
 class PETestTask(activity: Activity) : Thread() {
     private val TAG = "PETestTask"
     private val mActivity: Activity = activity
     private var numPic = -1
-    private var mode = PETaskScheduler.MODE_CPU
+    private var mode = PETaskSchedulerMode.MODE_CPU
     private var numThreads = -1
     private var cpuFp = PETaskScheduler.CPU_FP_32
     private var useGpuModelFp16 = false
@@ -32,7 +34,10 @@ class PETestTask(activity: Activity) : Thread() {
 
     private fun testRound(): Long {
         // 创建PETaskScheduler
-        val peTaskScheduler = PETaskScheduler(mActivity)
+        val peTaskScheduler = if (mode == PETaskSchedulerMode.MODE_GREEDY)
+                                  PETaskSchedulerV2(mActivity)
+                              else
+                                  PETaskScheduler(mActivity)
         // 初始化
         peTaskScheduler.init(192, numThreads, cpuFp, useGpuModelFp16, useGpuFp16)
         // 设置开始时间

@@ -11,7 +11,7 @@ class PETaskSchedulerWrapper(mActivity: Activity) {
     private val cpuFp = PETaskScheduler.CPU_INT_8
     private val useGpuModelFp16 = false
     private val useGpuFp16 = true
-    private val scheduleMode = PETaskScheduler.MODE_CPUGPU_MT_WMA
+    private val scheduleMode = PETaskSchedulerMode.MODE_CPUGPU_MT_WMA
 
     init {
         mPETaskScheduler.init(inputSize, numThreads, cpuFp, useGpuModelFp16, useGpuFp16)

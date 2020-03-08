@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
+import com.example.poseestimationapplication.peschedule.PETaskSchedulerMode
 import com.example.poseestimationapplication.tflite.ImageClassifierFloatInception
 import com.example.poseestimationapplication.tool.BitmapLoader
 import com.example.poseestimationapplication.tool.MathTool
@@ -14,16 +15,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.collections.ArrayList
 
-class PETaskScheduler(private val activity: Activity) {
+class PETaskScheduler(private val activity: Activity) : PETaskSchedulerInterface {
 
     companion object {
-        const val MODE_CPU = 0
-        const val MODE_GPU = 1
-        const val MODE_CPUGPU = 2
-        const val MODE_CPUGPU_WMA = 3
-        const val MODE_CPUGPU_MT = 4
-        const val MODE_CPUGPU_MT_WMA = 5
-
         const val CPU_INT_8 = 8
         const val CPU_FP_16 = 16
         const val CPU_FP_32 = 32
@@ -79,7 +73,7 @@ class PETaskScheduler(private val activity: Activity) {
     private var picWidth: Int = 192
     private var picHeight: Int = 192
 
-    private var curScheduleMode: Int = MODE_CPU
+    private var curScheduleMode: Int = PETaskSchedulerMode.MODE_CPU
     private var taskId: Int = 0
     private var taskStartTime: Long = System.currentTimeMillis()
     private var taskCostTime: Long = 0
@@ -92,26 +86,26 @@ class PETaskScheduler(private val activity: Activity) {
 
     private fun getScheduleModeName(mode: Int) : String {
         when (mode) {
-            MODE_CPU -> { return "CPU" }
-            MODE_GPU -> { return "GPU" }
-            MODE_CPUGPU -> { return "CPU-GPU" }
-            MODE_CPUGPU_WMA -> { return "CPU-GPU-WMA" }
-            MODE_CPUGPU_MT -> { return "CPU-GPU-MT" }
-            MODE_CPUGPU_MT_WMA -> { return "CPU-GPU-MT-WMA" }
+            PETaskSchedulerMode.MODE_CPU -> { return "CPU" }
+            PETaskSchedulerMode.MODE_GPU -> { return "GPU" }
+            PETaskSchedulerMode.MODE_CPUGPU -> { return "CPU-GPU" }
+            PETaskSchedulerMode.MODE_CPUGPU_WMA -> { return "CPU-GPU-WMA" }
+            PETaskSchedulerMode.MODE_CPUGPU_MT -> { return "CPU-GPU-MT" }
+            PETaskSchedulerMode.MODE_CPUGPU_MT_WMA -> { return "CPU-GPU-MT-WMA" }
         }
 
         return ""
     }
 
-    fun setTaskStartTime(time: Long) {
+    override fun setTaskStartTime(time: Long) {
         taskStartTime = time
     }
 
-    fun getTaskCostTime(): Long {
+    override fun getTaskCostTime(): Long {
         return taskCostTime
     }
 
-    fun isAllTasksFinished() : Boolean {
+    override fun isAllTasksFinished() : Boolean {
         return (!getIsCPURunning() && !getIsGPURunning()) &&
                 (cpuTasksQueue.getQueueSize() == 0 &&
                  gpuTasksQueue.getQueueSize() == 0)
@@ -251,7 +245,7 @@ class PETaskScheduler(private val activity: Activity) {
         Log.i(TAG, "PETaskScheduler warm up run finished")
     }
 
-    fun init(inputSize: Int, numThreads: Int,
+    override fun init(inputSize: Int, numThreads: Int,
              cpuFp: Int, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
         this.picWidth = inputSize
         this.picHeight = inputSize
@@ -259,7 +253,7 @@ class PETaskScheduler(private val activity: Activity) {
         //warmUpRun()
     }
 
-    fun close() {
+    override fun close() {
         closeTFLite()
         closeHandlerThreads()
         Log.i(TAG, "PETaskScheduler closed")
@@ -452,7 +446,7 @@ class PETaskScheduler(private val activity: Activity) {
 
                     gpuTasksQueue.dequeue()
 
-                    if (curScheduleMode >= MODE_CPUGPU)
+                    if (curScheduleMode >= PETaskSchedulerMode.MODE_CPUGPU)
                         addOrRemoveTaskFinishedFlag(FLAG_GPU_TASK_FINISH)
                     else
                         processResult()
@@ -524,7 +518,7 @@ class PETaskScheduler(private val activity: Activity) {
 
                     cpuTasksQueue.dequeue()
 
-                    if (curScheduleMode >= MODE_CPUGPU)
+                    if (curScheduleMode >= PETaskSchedulerMode.MODE_CPUGPU)
                         addOrRemoveTaskFinishedFlag(FLAG_CPU_TASK_FINISH)
                     else
                         processResult()
@@ -736,31 +730,31 @@ class PETaskScheduler(private val activity: Activity) {
         gpuTasksQueue.enqueue(gpuTasks)
     }
 
-    fun scheduleAndRun(pictures: ArrayList<Bitmap>, mode: Int): Long {
+    override fun scheduleAndRun(pictures: ArrayList<Bitmap>, mode: Int): Long {
 
         //Log.d(TAG, "PE tasks come")
 
         curScheduleMode = mode
-        useMultiThreadModel = (curScheduleMode == MODE_CPUGPU_MT ||
-                               curScheduleMode == MODE_CPUGPU_MT_WMA)
+        useMultiThreadModel = (curScheduleMode == PETaskSchedulerMode.MODE_CPUGPU_MT ||
+                               curScheduleMode == PETaskSchedulerMode.MODE_CPUGPU_MT_WMA)
 
         when (curScheduleMode) {
-            MODE_CPU -> {
+            PETaskSchedulerMode.MODE_CPU -> {
                 scheduleOnCPU(pictures)
             }
-            MODE_GPU -> {
+            PETaskSchedulerMode.MODE_GPU -> {
                 scheduleOnGPU(pictures)
             }
-            MODE_CPUGPU -> {
+            PETaskSchedulerMode.MODE_CPUGPU -> {
                 scheduleOnCPUGPU(pictures, false)
             }
-            MODE_CPUGPU_WMA -> {
+            PETaskSchedulerMode.MODE_CPUGPU_WMA -> {
                 scheduleOnCPUGPU(pictures, true)
             }
-            MODE_CPUGPU_MT -> {
+            PETaskSchedulerMode.MODE_CPUGPU_MT -> {
                 scheduleOnCPUGPUMT(pictures, false)
             }
-            MODE_CPUGPU_MT_WMA -> {
+            PETaskSchedulerMode.MODE_CPUGPU_MT_WMA -> {
                 scheduleOnCPUGPUMT(pictures, true)
             }
         }

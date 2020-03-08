@@ -10,6 +10,7 @@ import android.util.Log;
 import android.view.View;
 
 import com.example.poseestimationapplication.peschedule.PETaskSchedulerWrapper;
+import com.example.poseestimationapplication.peschedulev2.PETaskSchedulerWrapperV2;
 import com.example.poseestimationapplication.tool.BitmapLoader;
 
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ public class PETestActivity2 extends AppCompatActivity {
 
     private String TAG = "PETestActivity2";
 
-    private PETaskSchedulerWrapper mPETaskSchedulerWrapper;
+    private PETaskSchedulerWrapperV2 mPETaskSchedulerWrapper;
 
     private int frameCount = 0;
     private long lastFrameTime = 0;
@@ -41,20 +42,30 @@ public class PETestActivity2 extends AppCompatActivity {
         });
 
         // 创建Scheduler
-        mPETaskSchedulerWrapper = new PETaskSchedulerWrapper(this);
+        mPETaskSchedulerWrapper = new PETaskSchedulerWrapperV2(this);
 
-        int testFrameCount = 100;
+        // Human Count Array
+        //int[] humanCountArr = {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
+        //int[] humanCountArr = {1, 2, 1, 1, 2, 1, 2, 2, 1, 1};
+        int[] humanCountArr = {2, 3, 1, 4, 2, 3, 1, 4, 3, 2};
+
+        // Frame Setting
+        final int testFrameCount = humanCountArr.length;
+        final int frameInterval = 25;
+
         for (int i = 0; i < testFrameCount; i ++) {
+            final int humanCount = humanCountArr[i];
+
             new Thread() {
                 @Override
                 public void run() {
                     super.run();
-                    callTaskPESchedulerExample();
+                    callTaskPESchedulerExample(humanCount);
                 }
             }.start();
 
             try {
-                Thread.sleep(25);
+                Thread.sleep(frameInterval);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -64,13 +75,16 @@ public class PETestActivity2 extends AppCompatActivity {
     }
 
     // 调用Scheduler
-    private void callTaskPESchedulerExample() {
+    private void callTaskPESchedulerExample(int humanCountArr) {
         // 假设bitmaps是框出的human的图片
         // 假设图片数量是5，图片大小是192x192
-        ArrayList<Bitmap> bitmaps = BitmapLoader.Companion.loadAssetsPictures(this, 5);
+        ArrayList<Bitmap> bitmaps = BitmapLoader.Companion.loadAssetsPictures(this, humanCountArr);
 
         // 调用Scheduler进行调度和执行任务
         ArrayList<float[][]> pointArrays = mPETaskSchedulerWrapper.run(bitmaps);
+
+        if (pointArrays == null)
+            return;
 
         // 打印Point Arrays的数量，应该是5个
         Log.i(TAG, "Get point arrays size " + pointArrays.size());

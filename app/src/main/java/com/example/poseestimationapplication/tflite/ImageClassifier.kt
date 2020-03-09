@@ -42,7 +42,6 @@ internal constructor(
         // Get the number of bytes that is used to store a single color channel value.
         numBytesPerChannel: Int
 ) {
-
     /* Preallocated buffers for storing image data in.  */
     private val intValues = IntArray(imageSizeX * imageSizeY)
 
@@ -55,6 +54,22 @@ internal constructor(
     /** Number of bytes per channel, default is 4  */
     protected var numBytesPerChannel: Int = 4
 
+    /** Device Index  */
+    private var deviceIndex = DEVICE_ID_CPU
+
+    private fun getDeviceInfo(): String {
+        return when(deviceIndex) {
+            DEVICE_ID_CPU -> "CPU"
+            DEVICE_ID_GPU_FP32 -> "GPU_FP32"
+            DEVICE_ID_GPU_FP16 -> "GPU_FP16"
+            else -> "Unknown Device"
+        }
+    }
+
+    private fun setDeviceIndex(i: Int) {
+        deviceIndex = i
+    }
+
     public fun initTFLite(numThreads: Int, useGPU: Boolean, useGpuFp16: Boolean){
         val tfliteOptions = Interpreter.Options()
         tfliteOptions.setNumThreads(numThreads)
@@ -62,6 +77,9 @@ internal constructor(
             val gpuOptions = GpuDelegate.Options()
             gpuOptions.setPrecisionLossAllowed(useGpuFp16)
             tfliteOptions.addDelegate(GpuDelegate(gpuOptions))
+            setDeviceIndex(DEVICE_ID_GPU_FP32)
+            if (useGpuFp16)
+                setDeviceIndex(DEVICE_ID_GPU_FP16)
         }
         tflite = Interpreter(loadModelFile(activity), tfliteOptions)
     }
@@ -91,7 +109,8 @@ internal constructor(
         val startTime = SystemClock.uptimeMillis()
         runInference()
         val endTime = SystemClock.uptimeMillis()
-        Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime))
+        Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime)
+                        + " (" + getDeviceInfo() + ")")
 
         bitmap.recycle()
         // Print the results.
@@ -137,6 +156,7 @@ internal constructor(
         Log.d(
                 TAG,
                 "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime)
+                        + " (" + getDeviceInfo() + ")"
         )
     }
 
@@ -199,5 +219,9 @@ internal constructor(
 
         private const val FILTER_STAGES = 3
         private const val FILTER_FACTOR = 0.4f
+
+        private const val DEVICE_ID_CPU = 0
+        private const val DEVICE_ID_GPU_FP32 = 1
+        private const val DEVICE_ID_GPU_FP16 = 2
     }
 }

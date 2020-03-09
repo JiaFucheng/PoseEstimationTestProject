@@ -139,7 +139,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         // GPU Model
         hourGlassGPUModels = ImageClassifierFloatInception.create(
                 activity, imageSizeX = inputSize, imageSizeY = inputSize, modelPath = gpuModelName)
-        hourGlassGPUModels?.initTFLite(-1, useGpuModelFp16, useGpuFp16)
+        hourGlassGPUModels?.initTFLite(-1, true, useGpuFp16)
 
         Log.i(TAG, "Init TFLite OK")
     }
@@ -166,6 +166,11 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
     }
 
     private fun isDeviceBusy(): Boolean {
+        Log.i(TAG, "CPU ${getDeviceStatus(DEVICE_ID_CPU)}" +
+                " GPU ${getDeviceStatus(DEVICE_ID_GPU)}" +
+                " CpuControlThreadNum=${getCurCPUControlThreadNum()}" +
+                " CpuAvailableThreadNum=${getAvailableThreadNum()}")
+
         return (getDeviceStatus(DEVICE_ID_CPU) == DEVICE_STATUS_BUSY
                 || getDeviceStatus(DEVICE_ID_GPU) == DEVICE_STATUS_BUSY
                 || getCurCPUControlThreadNum() > 0
@@ -180,7 +185,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
     override fun close() {
         // Wait until all devices are free
-        waitIfDeviceIsBusy()
+        //waitIfDeviceIsBusy()
 
         closeThreadPool()
         closeTFLite()
@@ -201,15 +206,15 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
     /* CPU (inference) threads resource. **/
     @Synchronized private fun getAvailableThreadNum(): Int {
-        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+        //synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
             return availableCPUThreadNum
-        }
+        //}
     }
 
     @Synchronized private fun setAvailableThreadNum(num: Int) {
-        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+        //synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
             availableCPUThreadNum = num
-        }
+        //}
     }
 
     @Synchronized private fun allocCPUThreadsResource(num: Int): Int {
@@ -478,7 +483,11 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         }
     }
 
-    private fun runCPUControlThread() {
+    @Synchronized private fun runCPUControlThread() {
+        // Return when no available tasks
+        if (tasksQueue.getAvailableTaskCount() == 0)
+            return
+
         // Limit CPU control threads number
         val curCpuControlThreadsNum = getCurCPUControlThreadNum()
         if (curCpuControlThreadsNum >= maxCpuControlThreadsNum) {
@@ -522,10 +531,6 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                 && getAvailableThreadNum() == 0)
             return
 
-        // Return when no available tasks
-        if (tasksQueue.getAvailableTaskCount() == 0)
-            return
-
         runCPUControlThread()
     }
 
@@ -542,6 +547,8 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         // Reset task start time
         if (taskStartTime == -1L)
             setTaskStartTime(System.currentTimeMillis())
+
+        Log.i(TAG, "Frame scheduled at ${System.currentTimeMillis() - taskStartTime} ms")
 
         // Wrap human pictures
         val taskWrapper = PETaskWrapper(bitmaps)
@@ -587,6 +594,6 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
     }
 
     override fun isAllTasksFinished(): Boolean {
-        return isDeviceBusy()
+        return !isDeviceBusy()
     }
 }

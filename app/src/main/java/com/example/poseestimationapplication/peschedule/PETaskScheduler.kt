@@ -738,6 +738,8 @@ class PETaskScheduler(private val activity: Activity) : PETaskSchedulerInterface
         useMultiThreadModel = (curScheduleMode == PETaskSchedulerMode.MODE_CPUGPU_MT ||
                                curScheduleMode == PETaskSchedulerMode.MODE_CPUGPU_MT_WMA)
 
+        Log.i(TAG, "Task scheduled at ${System.currentTimeMillis() - taskStartTime} ms")
+
         when (curScheduleMode) {
             PETaskSchedulerMode.MODE_CPU -> {
                 scheduleOnCPU(pictures)

@@ -62,8 +62,13 @@ class PETestTask(activity: Activity) : Thread() {
         }
 
         // 等待所有任务完成
+        var waitCount = 0
         while (!peTaskScheduler.isAllTasksFinished()) {
             sleep(1000)
+            waitCount ++
+            if (waitCount % 10 == 0) {
+                Log.i(TAG, "Wait 10 times for PE tasks")
+            }
         }
         // 结束时关闭释放PETaskScheduler
         peTaskScheduler.close()

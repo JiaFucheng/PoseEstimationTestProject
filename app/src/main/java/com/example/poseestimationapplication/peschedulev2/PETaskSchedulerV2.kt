@@ -439,13 +439,14 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
                 //freeCPUThreadsResource(usedThreadNum)
             } else if (availableTaskCount == 2) {
-                val items = tasksQueue.getExecutableTaskItems(2)
                 if (availableCPUThreadNum == 4) {
                     val usedThreadNum = 4
                     val result = allocCPUThreadsResource(usedThreadNum)
                     if (result == RESULT_FAILED) {
                         return
                     }
+
+                    val items = tasksQueue.getExecutableTaskItems(2)
 
                     // numHumanThreads=2, numTFLiteThreads=2
                     classifyFrameH2T2(items)
@@ -458,6 +459,8 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                         return
                     }
 
+                    val items = tasksQueue.getExecutableTaskItems(2)
+
                     // One is numHumanThreads=1, numTFLiteThreads=2
                     // Another is Then numHumanThreads=1, numTFLiteThreads=1
                     classifyFrameH2T3(items)
@@ -466,7 +469,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                 }
             } else if (availableTaskCount == 3) {
                 // First numHumanThreads=2, numTFLiteThreads=2
-                val usedThreadNum = 4
+                val usedThreadNum = 3
                 val result = allocCPUThreadsResource(usedThreadNum)
                 if (result == RESULT_FAILED) {
                     return

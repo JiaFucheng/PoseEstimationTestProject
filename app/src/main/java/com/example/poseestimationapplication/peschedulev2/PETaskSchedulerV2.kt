@@ -22,6 +22,8 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
         private const val LOCK_ID_DEVICE_STATUS = 0
         private const val LOCK_ID_AVAILABLE_THREAD_NUM = 1
+        private const val LOCK_ID_AVAILABLE_CONTROL_THREAD_NUM = 2
+        private const val LOCK_ID_MODELS = 3
 
         private const val RESULT_OK = 0
         private const val RESULT_FAILED = -1
@@ -169,12 +171,12 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         Log.i(TAG, "CPU ${getDeviceStatus(DEVICE_ID_CPU)}" +
                 " GPU ${getDeviceStatus(DEVICE_ID_GPU)}" +
                 " CpuControlThreadNum=${getCurCPUControlThreadNum()}" +
-                " CpuAvailableThreadNum=${getAvailableThreadNum()}")
+                " CpuAvailableThreadNum=${getCPUThreadsResource()}")
 
         return (getDeviceStatus(DEVICE_ID_CPU) == DEVICE_STATUS_BUSY
                 || getDeviceStatus(DEVICE_ID_GPU) == DEVICE_STATUS_BUSY
                 || getCurCPUControlThreadNum() > 0
-                || getAvailableThreadNum() < maxCpuInferenceThreadsNum)
+                || getCPUThreadsResource() < maxCpuInferenceThreadsNum)
     }
 
     private fun waitIfDeviceIsBusy() {
@@ -217,79 +219,112 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         //}
     }
 
-    @Synchronized private fun allocCPUThreadsResource(num: Int): Int {
-        return if (num <= getAvailableThreadNum()) {
-            setAvailableThreadNum(getAvailableThreadNum() - num)
-            RESULT_OK
-        } else {
-            Log.e(TAG, "Allocate cpu threads failed" +
-                    " (cur=${getAvailableThreadNum()}, alloc=$num)")
-            RESULT_FAILED
+    private fun getCPUThreadsResource(): Int {
+        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+            return getAvailableThreadNum()
         }
     }
 
-    @Synchronized private fun freeCPUThreadsResource(num: Int): Int {
-        return if (getAvailableThreadNum() + num <= maxCpuInferenceThreadsNum) {
-            setAvailableThreadNum(getAvailableThreadNum() + num)
-            RESULT_OK
-        } else {
-            Log.e(TAG, "Free cpu threads failed" +
-                    " (cur=${getAvailableThreadNum()}, free=$num)")
-            RESULT_FAILED
+    private fun allocCPUThreadsResource(num: Int): Int {
+        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+            return if (num <= getAvailableThreadNum()) {
+                setAvailableThreadNum(getAvailableThreadNum() - num)
+                RESULT_OK
+            } else {
+                Log.e(TAG, "Allocate cpu threads failed" +
+                        " (cur=${getAvailableThreadNum()}, alloc=$num)")
+                RESULT_FAILED
+            }
+        }
+    }
+
+    private fun freeCPUThreadsResource(num: Int): Int {
+        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+            return if (getAvailableThreadNum() + num <= maxCpuInferenceThreadsNum) {
+                setAvailableThreadNum(getAvailableThreadNum() + num)
+                RESULT_OK
+            } else {
+                setAvailableThreadNum(maxCpuInferenceThreadsNum)
+                Log.e(TAG, "Free cpu threads failed" +
+                        " (cur=${getAvailableThreadNum()}, free=$num)")
+                RESULT_FAILED
+            }
         }
     }
 
     /* For constrain CPU threads number. **/
-    @Synchronized private fun getCurCPUControlThreadNum(): Int {
-        return curCpuControlThreadsNum
+    private fun getCurCPUControlThreadNum(): Int {
+        synchronized(locks[LOCK_ID_AVAILABLE_CONTROL_THREAD_NUM]) {
+            return curCpuControlThreadsNum
+        }
     }
 
-    @Synchronized private fun addCPUControlThreadNum() {
-        curCpuControlThreadsNum ++
+    private fun addCPUControlThreadNum() {
+        synchronized(locks[LOCK_ID_AVAILABLE_CONTROL_THREAD_NUM]) {
+            curCpuControlThreadsNum++
+        }
     }
 
-    @Synchronized private fun subCPUControlThreawdNum() {
-        curCpuControlThreadsNum --
+    private fun subCPUControlThreawdNum() {
+        synchronized(locks[LOCK_ID_AVAILABLE_CONTROL_THREAD_NUM]) {
+            curCpuControlThreadsNum --
+        }
     }
 
     /* Alloc CPU models resource. **/
-    @Synchronized private fun allocCPUHourGlassModelRes(numThreads: Int)
+    private fun allocCPUHourGlassModelRes(numThreads: Int)
             : ImageClassifierFloatInception? {
-        for (i in hourGlassCPUModels!![numThreads-1].indices) {
-            if (!cpuModelsBusyStatusArray[numThreads-1][i]) {
-                cpuModelsBusyStatusArray[numThreads-1][i] = true
-                return hourGlassCPUModels!![numThreads-1][i]
+        synchronized(locks[LOCK_ID_MODELS]) {
+            for (i in hourGlassCPUModels!![numThreads-1].indices) {
+                if (!cpuModelsBusyStatusArray[numThreads-1][i]) {
+                    cpuModelsBusyStatusArray[numThreads-1][i] = true
+                    return hourGlassCPUModels!![numThreads-1][i]
+                }
             }
+            return null
         }
-        return null
+
     }
 
     /* Free CPU models resource. **/
-    @Synchronized private fun freeCPUHourGlassModelRes(
+    private fun freeCPUHourGlassModelRes(
             numThreads: Int,
             model: ImageClassifierFloatInception) {
-        for (i in hourGlassCPUModels!![numThreads-1].indices) {
-            if (model == hourGlassCPUModels!![numThreads-1][i]) {
-                cpuModelsBusyStatusArray[numThreads-1][i] = false
+        synchronized(locks[LOCK_ID_MODELS]) {
+            for (i in hourGlassCPUModels!![numThreads - 1].indices) {
+                if (model == hourGlassCPUModels!![numThreads - 1][i]) {
+                    cpuModelsBusyStatusArray[numThreads - 1][i] = false
+                }
             }
         }
     }
 
     private fun gpuThreadTask() {
-        // Get executable task item
-        val items = tasksQueue.getExecutableTaskItems(1)
+        val taskCount = tasksQueue.getAvailableTaskCount()
+        var getItemCount = 1
+        if (taskCount >= 4) {
+            getItemCount = 2
+        }
+
+        // Get executable task items
+        val items = tasksQueue.getExecutableTaskItems(getItemCount)
         if (items.size > 0) {
-            Log.i(TAG, "GPU: Take 1 task")
-            val bitmap = items[0].getBitmap()
-            hourGlassGPUModels?.classifyFrame(bitmap!!)
-            val pointArray = hourGlassGPUModels?.getCopyPointArray()
-            val result = items[0].setPointArray(pointArray!!)
-            // Print current used time
-            if (result == PETaskWrapper.RESULT_FINISHED) {
-                taskUsedTime = System.currentTimeMillis() - taskStartTime
-                Log.i(TAG, "Frame finished at $taskUsedTime ms")
+            setDeviceStatus(DEVICE_ID_GPU, DEVICE_STATUS_BUSY)
+            Log.i(TAG, "GPU: Take $getItemCount task")
+            for (item in items) {
+                val bitmap = item.getBitmap()
+                hourGlassGPUModels?.classifyFrame(bitmap!!)
+                val pointArray = hourGlassGPUModels?.getCopyPointArray()
+                val result = item.setPointArray(pointArray!!)
+                // Print current used time
+                if (result == PETaskWrapper.RESULT_FINISHED) {
+                    taskUsedTime = System.currentTimeMillis() - taskStartTime
+                    Log.i(TAG, "Frame finished at $taskUsedTime ms")
+                }
             }
         }
+
+        setDeviceStatus(DEVICE_ID_GPU, DEVICE_STATUS_FREE)
     }
 
     private fun runGPUThreadsIfNot() {
@@ -303,7 +338,6 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
         threadPool.submit {
             while (tasksQueue.getAvailableTaskCount() > 0) {
-                setDeviceStatus(DEVICE_ID_GPU, DEVICE_STATUS_BUSY)
                 gpuThreadTask()
             }
             setDeviceStatus(DEVICE_ID_GPU, DEVICE_STATUS_FREE)
@@ -362,10 +396,10 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         classifyFrameHNTN(items, 1)
     }
 
-    private fun classifyFrameH2T2(items: ArrayList<PEExecutableTaskItem>) {
+    private fun classifyFrameH2T4(items: ArrayList<PEExecutableTaskItem>) {
         if (items.size != 2)
             return
-        classifyFrameHNTN(items, 2)
+        classifyFrameHNTN(items, 4)
     }
 
     private fun classifyFrameH2T3(items: ArrayList<PEExecutableTaskItem>) {
@@ -405,7 +439,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         if (availableTaskCount == 0)
             return
         // Check available cpu thread resource
-        val availableCPUThreadNum = getAvailableThreadNum()
+        val availableCPUThreadNum = getCPUThreadsResource()
         if (availableCPUThreadNum == 0)
             return
 
@@ -438,7 +472,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                 classifyFrameH1TN(items, usedThreadNum)
 
                 //freeCPUThreadsResource(usedThreadNum)
-            } else if (availableTaskCount == 2) {
+            } else if (availableTaskCount >= 2) {
                 if (availableCPUThreadNum == 4) {
                     val usedThreadNum = 4
                     val result = allocCPUThreadsResource(usedThreadNum)
@@ -449,7 +483,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                     val items = tasksQueue.getExecutableTaskItems(2)
 
                     // numHumanThreads=2, numTFLiteThreads=2
-                    classifyFrameH2T2(items)
+                    classifyFrameH2T4(items)
 
                     //freeCPUThreadsResource(usedThreadNum)
                 } else if (availableCPUThreadNum == 3) {
@@ -467,7 +501,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
                     //freeCPUThreadsResource(usedThreadNum)
                 }
-            } else if (availableTaskCount == 3) {
+            } /*else if (availableTaskCount == 3) {
                 // First numHumanThreads=2, numTFLiteThreads=2
                 val usedThreadNum = 4
                 var result = allocCPUThreadsResource(usedThreadNum)
@@ -476,7 +510,10 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                 }
 
                 val items0 = tasksQueue.getExecutableTaskItems(2)
-                classifyFrameH2T2(items0)
+                classifyFrameH2T4(items0)
+
+                // Bug: This situation is special.
+
                 // Then numHumanThreads=1, numTFLiteThreads=4
                 result = allocCPUThreadsResource(usedThreadNum)
                 if (result == RESULT_FAILED) {
@@ -486,11 +523,11 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                 classifyFrameH1T4(items1)
 
                 //freeCPUThreadsResource(usedThreadNum)
-            }
+            }*/
         }
     }
 
-    @Synchronized private fun runCPUControlThread() {
+    private fun runCPUControlThread() {
         // Return when no available tasks
         if (tasksQueue.getAvailableTaskCount() == 0)
             return
@@ -503,7 +540,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         }
 
         Log.i(TAG, "CPU: Start a new thread " +
-                "(id=$curCpuControlThreadsNum, res=${getAvailableThreadNum()})")
+                "(id=$curCpuControlThreadsNum, res=${getCPUThreadsResource()})")
 
         // Add one
         addCPUControlThreadNum()
@@ -535,7 +572,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
     private fun runCPUThreadsIfNot() {
         // Return when CPU device is busy and no available thread resource
         if (getDeviceStatus(DEVICE_ID_CPU) == DEVICE_STATUS_BUSY
-                && getAvailableThreadNum() == 0)
+                && getCPUThreadsResource() == 0)
             return
 
         runCPUControlThread()

@@ -7,16 +7,41 @@ class PETasksQueue {
     private val TAG = "PETasksQueue"
 
     private val queue = ArrayList<PETaskWrapper>()
-    private val lock: Byte = 0
+    private val syncLock: Byte = 0
+    private var locked: Boolean = false
+
+    fun isLocked(): Boolean {
+        synchronized(syncLock) {
+            return locked
+        }
+    }
+
+    fun tryLock(): Int {
+        synchronized(syncLock) {
+            return if (!locked) {
+                locked = true
+                ResultValue.OK
+            } else {
+                ResultValue.FAILED
+            }
+        }
+    }
+
+    fun unlock() {
+        synchronized(syncLock) {
+            if (locked)
+                locked = false
+        }
+    }
 
     fun enqueue(item: PETaskWrapper) {
-        synchronized(lock) {
+        synchronized(syncLock) {
             queue.add(item)
         }
     }
 
     fun getAvailableTaskCount(): Int {
-        synchronized(lock) {
+        synchronized(syncLock) {
             var count = 0
 
             for (task in queue) {
@@ -30,15 +55,17 @@ class PETasksQueue {
     }
 
     fun getExecutableTaskItems(num: Int): ArrayList<PEExecutableTaskItem> {
-        synchronized(lock) {
+        synchronized(syncLock) {
             val items = ArrayList<PEExecutableTaskItem>()
 
-            for (task in queue) {
+            for (q in queue.indices) {
+                val task = queue[q]
                 var i = 0
                 while (i != -1) {
                     i = task.getAvailableTaskIndex()
                     if (i != -1) {
                         items.add(PEExecutableTaskItem(task, i))
+                        Log.i(TAG, "Get executable task [$q,$i]")
                         if (items.size == num) {
                             break
                         }
@@ -55,7 +82,7 @@ class PETasksQueue {
     }
 
     fun dequeue(): PETaskWrapper? {
-        synchronized(lock) {
+        synchronized(syncLock) {
             return if (queue.size > 0) {
                 val task = queue[0]
                 queue.removeAt(0)
@@ -67,12 +94,24 @@ class PETasksQueue {
     }
 
     fun getFirstItem(): PETaskWrapper? {
-        synchronized(lock) {
+        synchronized(syncLock) {
             return if (queue.size > 0) {
                 queue[0]
             } else {
                 null
             }
         }
+    }
+
+    fun checkAllTasksFinished(): Boolean {
+        var result = true
+        for (i in queue.indices) {
+            val finished = queue[i].checkFinished()
+            if (!finished) {
+                Log.i(TAG, "Task $i in queue is unfinished")
+                result = false
+            }
+        }
+        return result
     }
 }

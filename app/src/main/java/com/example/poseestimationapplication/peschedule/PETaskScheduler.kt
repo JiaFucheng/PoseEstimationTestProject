@@ -84,19 +84,6 @@ class PETaskScheduler(private val activity: Activity) : PETaskSchedulerInterface
         initHandlerThreads()
     }
 
-    private fun getScheduleModeName(mode: Int) : String {
-        when (mode) {
-            PETaskSchedulerMode.MODE_CPU -> { return "CPU" }
-            PETaskSchedulerMode.MODE_GPU -> { return "GPU" }
-            PETaskSchedulerMode.MODE_CPUGPU -> { return "CPU-GPU" }
-            PETaskSchedulerMode.MODE_CPUGPU_WMA -> { return "CPU-GPU-WMA" }
-            PETaskSchedulerMode.MODE_CPUGPU_MT -> { return "CPU-GPU-MT" }
-            PETaskSchedulerMode.MODE_CPUGPU_MT_WMA -> { return "CPU-GPU-MT-WMA" }
-        }
-
-        return ""
-    }
-
     override fun setTaskStartTime(time: Long) {
         taskStartTime = time
     }
@@ -279,7 +266,7 @@ class PETaskScheduler(private val activity: Activity) : PETaskSchedulerInterface
         outputPointArraysQueue.enqueue(pointArrays)
 
         taskCostTime = System.currentTimeMillis() - taskStartTime
-        val modeName = getScheduleModeName(curScheduleMode)
+        val modeName = PETaskSchedulerMode.getScheduleModeName(curScheduleMode)
         Log.i(TAG, "Task $taskId finished at $taskCostTime ms Schedule Mode $modeName")
         taskId ++
     }

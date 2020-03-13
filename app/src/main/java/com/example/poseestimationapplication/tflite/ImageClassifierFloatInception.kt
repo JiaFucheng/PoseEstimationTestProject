@@ -33,7 +33,7 @@ class ImageClassifierFloatInception private constructor(
         return mPrintPointArray
     }
 
-    fun getCopyPointArray(): Array<FloatArray>? {
+    fun getCopyPointArray(): Array<FloatArray> {
         val outPointArray = Array (2) { FloatArray(14) }
         if (mPrintPointArray != null) {
             outPointArray[0] = mPrintPointArray!![0].copyOf()

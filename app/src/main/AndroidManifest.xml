@@ -21,6 +21,15 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".PETestInBackgroundActivity"
+            android:label="PEBGTest">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".PETestActivity2"
             android:label="PETest2"
             android:theme="@style/AppTheme.NoActionBar">

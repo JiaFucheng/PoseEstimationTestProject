@@ -26,9 +26,10 @@ class PETestTask(activity: Activity) : Thread() {
     override fun run() {
         super.run()
 
+        val modeName = PETaskSchedulerMode.getScheduleModeName(mode)
         for (i in 0 until testRound) {
             val costTime = testRound()
-            Log.i(TAG, "Round $i CostTime $costTime ms")
+            Log.i(TAG, "Mode $modeName Round $i CostTime $costTime ms")
         }
     }
 
@@ -77,9 +78,10 @@ class PETestTask(activity: Activity) : Thread() {
         return peTaskScheduler.getTaskCostTime()
     }
 
-    fun test(round: Int, frames: Int, frameInterval: Int, numPic: Int,
-             mode: Int, numThreads: Int,
-             cpuFp: Int, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
+    /** Set parameters of test. */
+    private fun setParameters(round: Int, frames: Int, frameInterval: Int, numPic: Int,
+                              mode: Int, numThreads: Int,
+                              cpuFp: Int, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
         this.testRound = round
         this.testFrameCount = frames
         this.frameIntervalTime = frameInterval
@@ -89,6 +91,23 @@ class PETestTask(activity: Activity) : Thread() {
         this.cpuFp = cpuFp
         this.useGpuModelFp16 = useGpuModelFp16
         this.useGpuFp16 = useGpuFp16
+    }
+
+    /** Run test in async mode. */
+    fun test(round: Int, frames: Int, frameInterval: Int, numPic: Int,
+             mode: Int, numThreads: Int,
+             cpuFp: Int, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
+        setParameters(round, frames, frameInterval, numPic, mode, numThreads,
+                      cpuFp, useGpuModelFp16, useGpuFp16)
         start()
+    }
+
+    /** Run test in sync mode. */
+    fun testSyncMode(round: Int, frames: Int, frameInterval: Int, numPic: Int,
+                     mode: Int, numThreads: Int,
+                     cpuFp: Int, useGpuModelFp16: Boolean, useGpuFp16: Boolean) {
+        setParameters(round, frames, frameInterval, numPic, mode, numThreads,
+                cpuFp, useGpuModelFp16, useGpuFp16)
+        run()
     }
 }

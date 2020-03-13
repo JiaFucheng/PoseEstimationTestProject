@@ -6,7 +6,7 @@ class PEExecutableTaskItem(
         private val task: PETaskWrapper,
         private val itemIndex: Int) {
 
-    fun getBitmap(): Bitmap? {
+    fun getBitmap(): Bitmap {
         return task.getBitmap(itemIndex)
     }
 

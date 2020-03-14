@@ -7,8 +7,10 @@ import com.example.poseestimationapplication.peschedule.PETaskScheduler
 import com.example.poseestimationapplication.peschedule.PETaskSchedulerInterface
 import com.example.poseestimationapplication.tflite.ImageClassifierFloatInception
 import java.lang.Thread.sleep
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Suppress("NAME_SHADOWING")
 class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterface {
@@ -22,7 +24,8 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         private const val DEVICE_STATUS_RUN = 2
 
         private const val LOCK_ID_DEVICE_STATUS = 0
-        private const val LOCK_ID_AVAILABLE_THREAD_NUM = 1
+        private const val LOCK_ID_READ_AVAILABLE_THREAD_NUM = 1
+        private const val LOCK_ID_WRITE_AVAILABLE_THREAD_NUM = 1
         private const val LOCK_ID_AVAILABLE_CONTROL_THREAD_NUM = 2
         private const val LOCK_ID_MODELS = 3
     }
@@ -50,7 +53,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
 
     private val cpuModelsBusyStatusArray = Array(4) { BooleanArray(4) }
     private var hourGlassCPUModels: ArrayList<ArrayList<ImageClassifierFloatInception>> ?= null
-    private var hourGlassGPUModels: ImageClassifierFloatInception ?= null
+    private var hourGlassGPUModel: ImageClassifierFloatInception ?= null
 
     // CPU Control Threads Number + CPU Inference Threads Number - 1 + 1 GPU Control/Inference Thread
     private var threadPool: ExecutorService = Executors.newFixedThreadPool(
@@ -139,9 +142,9 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
         }
 
         // GPU Model
-        hourGlassGPUModels = ImageClassifierFloatInception.create(
+        hourGlassGPUModel = ImageClassifierFloatInception.create(
                 activity, imageSizeX = inputSize, imageSizeY = inputSize, modelPath = gpuModelName)
-        hourGlassGPUModels?.initTFLite(-1, true, useGpuFp16)
+        hourGlassGPUModel?.initTFLite(-1, true, useGpuFp16)
 
         Log.i(TAG, "Init TFLite OK")
     }
@@ -161,10 +164,17 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
                 model.close()
             }
         }
+
+        hourGlassGPUModel?.close()
     }
 
     private fun closeThreadPool() {
         threadPool.shutdown()
+
+        val waitTime = 10L // second
+        if (!threadPool.awaitTermination(waitTime, TimeUnit.SECONDS)) {
+            Log.i(TAG, "ThreadPool: Shutdown over $waitTime sec")
+        }
     }
 
     private fun isDeviceBusy(): Boolean {
@@ -207,26 +217,26 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
     }
 
     /* CPU (inference) threads resource. **/
-    @Synchronized private fun getAvailableThreadNum(): Int {
+    private fun getAvailableThreadNum(): Int {
         //synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
             return availableCPUThreadNum
         //}
     }
 
-    @Synchronized private fun setAvailableThreadNum(num: Int) {
+    private fun setAvailableThreadNum(num: Int) {
         //synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
             availableCPUThreadNum = num
         //}
     }
 
     private fun getCPUThreadsResource(): Int {
-        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+        synchronized(locks[LOCK_ID_READ_AVAILABLE_THREAD_NUM]) {
             return getAvailableThreadNum()
         }
     }
 
     private fun allocCPUThreadsResource(num: Int): Int {
-        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+        synchronized(locks[LOCK_ID_WRITE_AVAILABLE_THREAD_NUM]) {
             return if (num <= getAvailableThreadNum()) {
                 setAvailableThreadNum(getAvailableThreadNum() - num)
                 ResultValue.OK
@@ -239,7 +249,7 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
     }
 
     private fun freeCPUThreadsResource(num: Int): Int {
-        synchronized(locks[LOCK_ID_AVAILABLE_THREAD_NUM]) {
+        synchronized(locks[LOCK_ID_WRITE_AVAILABLE_THREAD_NUM]) {
             return if (getAvailableThreadNum() + num <= maxCpuInferenceThreadsNum) {
                 setAvailableThreadNum(getAvailableThreadNum() + num)
                 ResultValue.OK
@@ -283,7 +293,6 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
             }
             return null
         }
-
     }
 
     /* Free CPU models resource. **/
@@ -337,8 +346,8 @@ class PETaskSchedulerV2(private val activity: Activity) : PETaskSchedulerInterfa
             for (i in items.indices) {
                 val item = items[i]
                 val bitmap = item.getBitmap()
-                hourGlassGPUModels?.classifyFrame(bitmap)
-                val pointArray = hourGlassGPUModels?.getCopyPointArray()
+                hourGlassGPUModel?.classifyFrame(bitmap)
+                val pointArray = hourGlassGPUModel?.getCopyPointArray()
                 if (pointArray != null) {
                     val result = item.setPointArray(pointArray)
                     //Log.i(TAG, "GPU: Set point array")

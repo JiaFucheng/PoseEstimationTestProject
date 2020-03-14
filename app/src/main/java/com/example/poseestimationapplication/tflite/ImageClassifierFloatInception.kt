@@ -141,9 +141,9 @@ class ImageClassifierFloatInception private constructor(
             //Log.i("TestOutPut", "pic[$i] ($maxX,$maxY) $max")
         }
 
-        //val pointArrayX = mPrintPointArray!![0]
-        //val pointArrayY = mPrintPointArray!![1]
-        //Log.d("PointArray", "[${Arrays.toString(pointArrayX)},[${Arrays.toString(pointArrayY)}]")
+        val pointArrayX = mPrintPointArray!![0]
+        val pointArrayY = mPrintPointArray!![1]
+        Log.d("PointArray", "[${pointArrayX.contentToString()},[${pointArrayY.contentToString()}]")
     }
 
     private operator fun get(

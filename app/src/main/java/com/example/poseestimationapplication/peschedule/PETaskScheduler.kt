@@ -13,6 +13,7 @@ import java.lang.Thread.sleep
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 
 class PETaskScheduler(private val activity: Activity) : PETaskSchedulerInterface {
@@ -141,6 +142,10 @@ class PETaskScheduler(private val activity: Activity) : PETaskSchedulerInterface
 
     private fun closeHandlerThreads() {
         threadPool.shutdown()
+        if (!threadPool.awaitTermination(10, TimeUnit.SECONDS)) {
+            Log.i(TAG, "ThreadPool: Shutdown over 10 sec")
+        }
+
         cpuHandlerThread?.quit()
         gpuHandlerThread?.quit()
         heatMapsHandlerThread?.quit()
